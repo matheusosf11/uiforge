@@ -38,6 +38,13 @@ export function CodeView({
 
   const disabled = busy || !code.trim();
 
+  function scheduleCopyReset() {
+    timeoutRef.current = window.setTimeout(() => {
+      setCopyState("idle");
+      timeoutRef.current = null;
+    }, 2000);
+  }
+
   async function handleCopy() {
     if (timeoutRef.current !== null) {
       window.clearTimeout(timeoutRef.current);
@@ -46,10 +53,7 @@ export function CodeView({
     try {
       await navigator.clipboard.writeText(code);
       setCopyState("copied");
-      timeoutRef.current = window.setTimeout(() => {
-        setCopyState("idle");
-        timeoutRef.current = null;
-      }, 2000);
+      scheduleCopyReset();
     } catch {
       const pre = preRef.current;
       const selection = window.getSelection();
@@ -60,6 +64,8 @@ export function CodeView({
         selection.addRange(range);
       }
       setCopyState("failed");
+      // Return to "Copiar" too, so the button isn't stuck on the failure label.
+      scheduleCopyReset();
     }
   }
 
