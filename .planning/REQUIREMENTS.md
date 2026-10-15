@@ -28,8 +28,8 @@
 
 ### UX & Accessibility
 
-- [ ] **UX-01**: User can toggle light/dark theme (persisted)
-- [ ] **UX-02**: UI is responsive across mobile and desktop
+- [x] **UX-01**: User can toggle light/dark theme (persisted)
+- [x] **UX-02**: UI is responsive across mobile and desktop
 - [ ] **UX-03**: UI communicates loading, empty, and error states accessibly (aria-live for streaming)
 - [ ] **UX-04**: App surfaces a friendly error with retry when the API fails or rate-limits (429)
 
@@ -83,8 +83,8 @@ Mapped during roadmap creation (2026-10-15).
 | GEN-02 | Phase 3 | Complete |
 | EDIT-02 | Phase 3 | Complete |
 | EDIT-03 | Phase 3 | Complete |
-| UX-01 | Phase 3 | Pending |
-| UX-02 | Phase 3 | Pending |
+| UX-01 | Phase 3 | Complete |
+| UX-02 | Phase 3 | Complete |
 | UX-03 | Phase 3 | Pending |
 | UX-04 | Phase 3 | Pending |
 | QUAL-01 | Phase 4 | Pending |
