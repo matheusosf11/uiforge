@@ -67,16 +67,36 @@
 
 ## Traceability
 
-Populated during roadmap creation.
+Mapped during roadmap creation (2026-10-15).
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (to be mapped by roadmapper) | | Pending |
+| GEN-01 | Phase 1 | Pending |
+| GEN-03 | Phase 1 | Pending |
+| GEN-04 | Phase 1 | Pending |
+| GEN-05 | Phase 1 | Pending |
+| GEN-06 | Phase 1 | Pending |
+| EDIT-01 | Phase 1 | Pending |
+| PREV-01 | Phase 2 | Pending |
+| PREV-02 | Phase 2 | Pending |
+| PREV-03 | Phase 2 | Pending |
+| GEN-02 | Phase 3 | Pending |
+| EDIT-02 | Phase 3 | Pending |
+| EDIT-03 | Phase 3 | Pending |
+| UX-01 | Phase 3 | Pending |
+| UX-02 | Phase 3 | Pending |
+| UX-03 | Phase 3 | Pending |
+| UX-04 | Phase 3 | Pending |
+| QUAL-01 | Phase 4 | Pending |
+| QUAL-02 | Phase 4 | Pending |
+| QUAL-03 | Phase 4 | Pending |
+| QUAL-04 | Phase 4 | Pending |
+| QUAL-05 | Phase 4 | Pending |
 
 **Coverage:**
 - v1 requirements: 21 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 21
+- Mapped to phases: 21 (100%)
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-10-15*

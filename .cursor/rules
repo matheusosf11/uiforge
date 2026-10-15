@@ -1,0 +1,172 @@
+<!-- GSD:project-start source:PROJECT.md -->
+## Project
+
+**UIForge**
+
+UIForge is an AI-powered UI component generator (a focused "v0 lite"): the user describes a component in natural language and the app generates self-contained React + Tailwind code in real time (streaming) and renders it live in a secure sandboxed preview, with an editor and copy/download actions. It is a portfolio showcase project built by and for front-end engineers to demonstrate modern web and AI-integration skills to recruiters at large companies.
+
+**Core Value:** A user types a prompt and gets working, previewable React + Tailwind component code streamed back and rendered live — the generate-to-preview loop must feel fast, polished, and reliable.
+
+### Constraints
+
+- **Tech stack**: Next.js 15 App Router + TypeScript + Tailwind CSS + shadcn/ui — modern stack recruiters recognize.
+- **AI/Budget**: Must use a free LLM tier (Google Gemini) — no paid API required to run the demo.
+- **Security**: Generated code executes only inside the Sandpack sandbox iframe, never in the host app context.
+- **Deployment**: Must deploy publicly on Vercel (free tier) with a shareable link for the portfolio.
+- **Auth**: No login in v1.
+<!-- GSD:project-end -->
+
+<!-- GSD:stack-start source:research/STACK.md -->
+## Technology Stack
+
+## Recommended Stack
+### Core Technologies
+| Technology | Version | Purpose | Why Recommended |
+|------------|---------|---------|-----------------|
+| Next.js | `15.5.28` (latest 15.x) | App Router framework, Route Handlers, RSC, deploy target | Project's chosen stack; App Router + Route Handlers are the idiomatic home for the server-side LLM call and streaming. Recruiters recognize it. (16.x exists but is out of scope.) |
+| React | `19.3.1` | UI runtime | Required pairing for Next 15 (Next 15 ships against React 19). |
+| React DOM | `19.3.1` | DOM renderer | Matches React. |
+| TypeScript | `5.9.3` | Type safety | Stable, fully supported by Next 15 toolchain and all libraries below. **Do not jump to TS 7.x yet** (see "What NOT to Use"). |
+| Tailwind CSS | `4.3.3` | Styling (host app + generated components) | v4 is current. CSS-first config (`@import "tailwindcss"`), no `tailwind.config.js` required, Oxide engine. shadcn/ui now targets v4. |
+| @tailwindcss/postcss | `4.3.3` | Tailwind v4 PostCSS plugin | v4 moved the PostCSS integration into this dedicated package — this is the required wiring for Next.js. |
+| Vercel AI SDK (`ai`) | `7.0.141` | `streamText`, streaming primitives | First-class token streaming, provider-agnostic, built by Vercel for exactly this Route-Handler-streaming use case. |
+| @ai-sdk/google | `4.0.96` | Google Gemini provider for the AI SDK | Direct Gemini access via `GOOGLE_GENERATIVE_AI_API_KEY`; the `latest` tag is the v7-compatible line (see Version Compatibility). |
+| @codesandbox/sandpack-react | `2.20.0` | Secure sandboxed live preview + code editor | Runs untrusted generated code inside an isolated iframe (never the host context). Ships bundler, CodeMirror editor, and preview as one package — exactly the generate→preview loop. |
+### Supporting Libraries
+| Library | Version | Purpose | When to Use |
+|---------|---------|---------|-------------|
+| @ai-sdk/react | `4.0.144` | Client hooks (`useChat`, `useCompletion`) | Optional. Only if you prefer a hook over a hand-rolled `fetch`+reader. For single-shot code gen a plain fetch is simpler (see Gotchas). |
+| zod | `4.6.7` | Schema validation | Validate the inbound request body in the Route Handler (`{ prompt }`), and any structured output. AI SDK v7 natively supports Zod 4. |
+| shadcn (CLI) | `4.21.5` | Component scaffolding | `npx shadcn@latest init` / `add`. Generates accessible Radix-based components into your repo. Targets Tailwind v4 + React 19. |
+| lucide-react | `1.57.0` | Icon set | Icons for the app shell (copy, download, theme toggle, etc.). shadcn's default icon library. |
+| next-themes | `0.4.6` | Light/dark theme | Class-based theme switching with no flash; the standard for App Router dark mode. |
+| motion | `14.2.0` | Animation (formerly `framer-motion`) | Streaming cursor, panel transitions, loading states. **Import from `motion/react`** — the library rebranded from `framer-motion`. |
+| tailwind-merge | `3.7.0` | Class de-duplication | Pulled in by shadcn's `cn()` helper. |
+| clsx | `2.1.1` | Conditional class names | Pulled in by shadcn's `cn()` helper. |
+| class-variance-authority | `0.7.1` | Variant styling | Used by shadcn component variants. |
+| tw-animate-css | `1.4.0` | Tailwind v4 animation utilities | shadcn v4 replacement for the deprecated `tailwindcss-animate`. |
+| @tailwindcss/browser | `4.3.3` | Tailwind runtime for the **sandbox iframe** | Inject into the Sandpack preview so generated Tailwind classes actually render (see Gotchas). |
+### Development Tools
+| Tool | Purpose | Notes |
+|------|---------|-------|
+| Vitest `5.0.4` | Unit/component test runner | Vite-native, fast, Jest-compatible API. Use `environment: 'jsdom'`, `globals: true`. Pair with `@vitejs/plugin-react@6.1.2`. |
+| @vitejs/plugin-react `6.1.2` | JSX/Fast-Refresh for Vitest | Required so Vitest can transform React components. |
+| @testing-library/react `16.3.3` | Component testing | React 19 compatible. Pair with `@testing-library/jest-dom@7.0.1` matchers and `@testing-library/user-event`. |
+| @testing-library/jest-dom `7.0.1` | DOM matchers | `toBeInTheDocument()` etc. Register via a Vitest setup file. |
+| jsdom `30.1.2` | DOM environment for Vitest | Set as Vitest `environment`. |
+| @playwright/test `1.64.1` | E2E testing | One happy-path e2e: type prompt → stream → preview renders. Run against `next build && next start` in CI. |
+| ESLint (`eslint-config-next@15.5.28`) | Linting | Keep the Next-matched config version to avoid rule drift. |
+| @types/react `19.3.0`, @types/node `26.6.5` | Types | Match the React 19 / Node runtime. |
+| GitHub Actions | CI | Matrix: install → typecheck → lint → `vitest run` → `playwright test` → build. Use `actions/setup-node@v4` with Node 22. |
+| Vercel | Hosting | Zero-config Next.js deploy; set `GOOGLE_GENERATIVE_AI_API_KEY` as an env var in project settings. |
+## Installation
+# Scaffold (choose App Router + TypeScript + Tailwind + ESLint when prompted)
+# Core AI + preview
+# UI / UX
+# (shadcn adds: tailwind-merge, clsx, class-variance-authority, tw-animate-css)
+# Tailwind runtime that will be injected INTO the sandbox preview
+# Optional: AI SDK React hooks (only if using useCompletion instead of raw fetch)
+# Dev / test
+## Integration Notes & Gotchas (the part that saves hours)
+### 1. Vercel AI SDK — streaming code from a Route Handler (HIGH)
+- `result.toTextStreamResponse()` is a convenience that typically does the same thing; the raw `textStream` return above is the version-robust form I verified against the v7 reference. (MEDIUM on the exact convenience method name; HIGH on the `textStream`/`ReadableStream` approach.)
+- **Do NOT use `useChat` here** — this is single-shot code generation, not a chat. Either read the stream with a plain fetch, or use `useCompletion` from `@ai-sdk/react`.
+### 2. Google Gemini model + key (HIGH on key/provider, MEDIUM on exact model)
+- Env var is **`GOOGLE_GENERATIVE_AI_API_KEY`** (read automatically by `@ai-sdk/google`). Put it in `.env.local` and in Vercel project settings. Never expose it to the client.
+- **Model:** `gemini-2.5-flash` is the recommended free-tier-friendly default (fast, cheap, documented). Fallbacks/lighter options: `gemini-2.5-flash-lite`, `gemini-2.0-flash`. Newer `gemini-3.5-flash` / `gemini-3-flash-preview` are also available via the provider but free-tier eligibility shifts over time — **verify the current free-tier model list in Google AI Studio before committing.** (MEDIUM: free-tier model availability is the single most volatile fact in this doc.)
+- Documented fallback provider: `@ai-sdk/groq` (Llama models) — same `streamText` call, swap the model factory. Keep it behind an env flag.
+### 3. Sandpack — making Tailwind render inside the sandbox (MEDIUM–HIGH)
+- Use `@tailwindcss/browser@4` (the v4 CDN/browser build), **not** the old v3 `https://cdn.tailwindcss.com` script. (This is the #1 integration gotcha.)
+- Sandpack ships its own CodeMirror editor (`SandpackCodeEditor` / `SandpackPreview` when composing manually), so you don't need a separate editor like Monaco.
+- Sandpack-react `2.20.0` declares a React `^16.8 || ^17 || ^18 || ^19` peer range → React 19 is supported.
+- The iframe is the security boundary. **Never** `eval`/render generated code in the host app.
+### 4. Tailwind v4 + shadcn/ui setup (HIGH)
+- v4 is CSS-first: in `app/globals.css` use `@import "tailwindcss";` and define tokens with `@theme` — there is **no `tailwind.config.js`** by default.
+- PostCSS config uses `@tailwindcss/postcss` (not the old `tailwindcss` + `autoprefixer` plugin pair).
+- `npx shadcn@latest init` detects v4 and wires `components.json`, the `cn()` helper, and `tw-animate-css`. Do not hand-install `tailwindcss-animate` (deprecated for v4).
+### 5. next-themes in App Router (HIGH)
+### 6. motion vs framer-motion (HIGH)
+## Alternatives Considered
+| Recommended | Alternative | When to Use Alternative |
+|-------------|-------------|-------------------------|
+| Vercel AI SDK (`ai`) | Google `@google/genai` SDK directly | If you never need provider-swapping or the SDK's streaming helpers. AI SDK wins here for the Groq fallback + Route-Handler streaming ergonomics. |
+| @ai-sdk/google (Gemini) | @ai-sdk/groq (Llama 3.x) | Fallback when Gemini free-tier quota is exhausted; already a documented project fallback. |
+| @codesandbox/sandpack-react | `react-live`, raw `iframe srcdoc` | `react-live` for a tiny single-expression preview with no bundler; raw iframe only if you must minimize deps. Sandpack wins for multi-file, bundling, editor, and isolation. |
+| Plain fetch stream reader | `useCompletion` (`@ai-sdk/react`) | Use `useCompletion` if you want built-in `isLoading`/`stop`/error state for free. Raw fetch keeps the dep surface smaller. |
+| next-themes | hand-rolled theme context | Only if you want zero deps; next-themes handles FOUC + system preference for free. |
+| Vitest | Jest | Jest only in a legacy project already standardized on it. For a 2026 Vite/RSC project, Vitest is the default. |
+| Sandpack CodeMirror editor | Monaco Editor | Monaco if you need VS Code-grade editing/intellisense. Overkill for a read-mostly preview. |
+## What NOT to Use
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| Next.js **Pages Router** | Legacy; no RSC/Route-Handler streaming story recruiters look for | App Router + Route Handlers |
+| `framer-motion` package name | Renamed to `motion`; imports changed to `motion/react` | `motion` |
+| Tailwind v3 config (`tailwind.config.js`, `tailwindcss` PostCSS plugin, `autoprefixer`) | v4 is CSS-first with `@tailwindcss/postcss` | Tailwind v4 + `@tailwindcss/postcss` |
+| `tailwindcss-animate` | Deprecated for Tailwind v4 | `tw-animate-css` (shadcn v4 default) |
+| v3 Tailwind Play CDN (`https://cdn.tailwindcss.com`) inside the sandbox | Won't drive v4 utilities | `@tailwindcss/browser@4` injected into the sandbox iframe |
+| Legacy AI SDK v3/v4 APIs (`StreamingTextResponse`, `OpenAIStream`, `experimental_StreamData`) | Removed in v5+; training data still suggests them | v7 `streamText` + `textStream` / `toTextStreamResponse()` |
+| Running generated code in the host app (`eval`, `new Function`, dangerouslySetInnerHTML) | Executes untrusted LLM output in your origin | Sandpack isolated iframe only |
+| TypeScript 7.x | Brand-new native-port major; ecosystem/types (Next, @types/react) still target TS 5 | TypeScript 5.9.x |
+| Exposing the Gemini key client-side / calling Google from the browser | Leaks the API key | Keep the call in a server Route Handler with the env var |
+| State libs (Redux/Zustand) for v1 | No shared/persistent state in scope (no auth, no history) | React local state + the stream reader |
+## Stack Patterns by Variant
+- Add `@ai-sdk/groq` and switch the model factory behind an env flag.
+- Because the AI SDK abstracts the provider, only the one `model:` line changes.
+- Use `SandpackProvider` + `SandpackCodeEditor` + `SandpackPreview` composed manually instead of the all-in-one `<Sandpack>`, giving you control over layout, tabs, and the console.
+- Sandpack already handles multiple files via the `files` map — multi-file generation is a natural extension, not a rewrite.
+## Version Compatibility
+| Package A | Compatible With | Notes |
+|-----------|-----------------|-------|
+| `next@15.5.28` | `react@19.3.1`, `react-dom@19.3.1`, `@types/react@19.3.0` | Next 15 is built against React 19. Keep React + types in lockstep. |
+| `ai@7.0.141` | `@ai-sdk/google@4.0.96`, `@ai-sdk/react@4.0.144`, `zod@4.6.7` | The `latest` dist-tags of these provider/UI packages are the v7-aligned line. **Do not mix** an `ai@7` with an `ai-v5`/`ai-v6`-tagged provider build. |
+| `tailwindcss@4.3.3` | `@tailwindcss/postcss@4.3.3`, `shadcn@4.21.5`, `tw-animate-css@1.4.0` | All v4-aware. shadcn CLI detects v4 automatically. |
+| `@codesandbox/sandpack-react@2.20.0` | `react@19` | Peer range `^16.8 || ^17 || ^18 || ^19`; React 19 OK. |
+| `vitest@5.0.4` | `@vitejs/plugin-react@6.1.2`, `jsdom@30.1.2`, `@testing-library/react@16.3.3`, `@testing-library/jest-dom@7.0.1` | Standard 2026 Vitest component-test matrix; RTL 16 is React 19 compatible. |
+| `motion@14.2.0` | `react@19` | Import from `motion/react`. |
+## Sources
+- npm registry via `npm view <pkg> version dist-tags` (2026-10-15) — exact current versions for every package above (HIGH).
+- https://ai-sdk.dev/docs/getting-started/nextjs-app-router — AI SDK v7 Route Handler + `streamText` + client wiring (HIGH).
+- https://ai-sdk.dev/providers/ai-sdk-providers/google-generative-ai — `@ai-sdk/google` provider, `GOOGLE_GENERATIVE_AI_API_KEY`, Gemini model list/capability table (HIGH on provider/key; MEDIUM on which models are free-tier eligible).
+- https://ai-sdk.dev/docs/reference/ai-sdk-core/stream-text — confirmed `textStream` is an `AsyncIterableStream`/`ReadableStream` in v7 (HIGH).
+- `.planning/PROJECT.md` — project constraints (Next 15, Gemini free tier, Sandpack isolation, no auth, Vercel).
+<!-- GSD:stack-end -->
+
+<!-- GSD:conventions-start source:CONVENTIONS.md -->
+## Conventions
+
+Conventions not yet established. Will populate as patterns emerge during development.
+<!-- GSD:conventions-end -->
+
+<!-- GSD:architecture-start source:ARCHITECTURE.md -->
+## Architecture
+
+Architecture not yet mapped. Follow existing patterns found in the codebase.
+<!-- GSD:architecture-end -->
+
+<!-- GSD:skills-start source:skills/ -->
+## Project Skills
+
+No project skills found. Add skills to any of: `.claude/skills/`, `.agents/skills/`, `.cursor/skills/`, `.github/skills/`, or `.codex/skills/` with a `SKILL.md` index file.
+<!-- GSD:skills-end -->
+
+<!-- GSD:workflow-start source:GSD defaults -->
+## GSD Workflow Enforcement
+
+Before using Edit, Write, or other file-changing tools, start work through a GSD command so planning artifacts and execution context stay in sync.
+
+Use these entry points:
+- `/gsd-quick` for small fixes, doc updates, and ad-hoc tasks
+- `/gsd-debug` for investigation and bug fixing
+- `/gsd-execute-phase` for planned phase work
+
+Do not make direct repo edits outside a GSD workflow unless the user explicitly asks to bypass it.
+<!-- GSD:workflow-end -->
+
+
+
+<!-- GSD:profile-start -->
+## Developer Profile
+
+> Profile not yet configured. Run `/gsd-profile-user` to generate your developer profile.
+> This section is managed by `generate-claude-profile` -- do not edit manually.
+<!-- GSD:profile-end -->
