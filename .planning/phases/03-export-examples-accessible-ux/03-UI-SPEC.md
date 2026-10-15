@@ -42,9 +42,10 @@ Declared values (multiples of 4; Tailwind 4px unit):
 | lg | 24px | `p-6`, `gap-6` | Page padding (mobile), header → shell gap |
 | xl | 32px | `md:p-8` | Page padding (desktop) |
 | 2xl | 48px | — | Not used this phase |
-| 3xl | 64px | `min-h-64` = 256px (16×16) | Minimum panel height (Preview, Code, Prompt) |
+| 3xl | 64px | — | Not used this phase |
 
 Exceptions:
+- Component dimension (not a spacing token): panels keep `min-h-64` = 256px minimum height (Preview, Código gerado, Prompt).
 - 12px (`gap-3`, `px-3`, `mt-3`): right-column stack gap (status → alert → tabs → panels), alert horizontal padding, textarea → chips gap and chips → Gerar row gap. Multiple of 4, kept from existing code.
 - Mobile tab buttons: `h-11` (44px) touch target.
 - Chips, Copiar, Baixar, Tentar de novo: `size="sm"` = 28px height (`h-7`). Accepted below 44px because they are secondary, spaced 8px apart, and on desktop pointer-first; do not shrink further.
@@ -59,9 +60,11 @@ Exceptions:
 | Code / Small label | 12px (`text-xs`) | 400 | 1.625 (`leading-relaxed`) for code; 1.33 for chip/button labels | CodeView `<pre>`, chip labels, Copiar/Baixar/Tentar de novo labels (override `size="sm"` default `text-[0.8rem]` with `text-xs`) |
 | Body | 14px (`text-sm`) | 400 | 1.43 (Tailwind default for `text-sm`, 20px) | Subtitle, status line, alert text, empty-state copy, textarea |
 | Label / Panel heading | 14px (`text-sm`) | 500 (`font-medium`) | 1.43 | Panel `h2` (“Prompt”, “Preview”, “Código gerado”), tab labels, Gerar/Parar |
-| Display | 24px (`text-2xl`) | 600 (`font-semibold`, `tracking-tight`) | 1.33 | Page title “UIForge” only (unchanged from Phase 1) |
+| Display | 24px (`text-2xl`) | 500 (`font-medium`, `tracking-tight`) | 1.33 | Page title “UIForge” only |
 
-Sizes declared: 12, 14, 24 (3 sizes). Weights: 400 and 500 for all new UI in this phase; the single pre-existing 600 on the “UIForge” `h1` is retained untouched and must not be reused elsewhere.
+Sizes declared: 12, 14, 24 (3 sizes). Weights: 400 and 500.
+
+In scope this phase: change the “UIForge” `h1` in `src/app/page.tsx` from `font-semibold` to `font-medium` (keep `text-2xl tracking-tight`). No `font-semibold` / `font-bold` anywhere in the UI after this phase.
 
 ---
 
@@ -91,8 +94,12 @@ Code highlighting (D-11): `prism-react-renderer` `themes.nightOwl` when resolved
 
 ## Layout & Interaction Contract
 
+### Focal point / hierarchy
+- Desktop: the Preview panel (top of right column) is the primary anchor; the Gerar CTA in the Prompt panel — the only accent-filled control — is the secondary anchor.
+- Mobile: the active tab panel (Preview by default) comes first, then the Gerar CTA below in the Prompt panel.
+
 ### Header (`src/app/page.tsx`, stays a Server Component)
-- Row: `flex items-center justify-between gap-3` → `h1` “UIForge” left, `<ThemeToggle />` right. Subtitle `p` (text-sm, muted) below the row, unchanged copy.
+- Row: `flex items-center justify-between gap-3` → `h1` “UIForge” (`text-2xl font-medium tracking-tight`) left, `<ThemeToggle />` right. Subtitle `p` (text-sm, muted) below the row, unchanged copy.
 - ThemeToggle: `Button variant="ghost" size="icon"`, icon 16px. Dark active → `Sun` icon, `aria-label="Ativar tema claro"`. Light active → `Moon` icon, `aria-label="Ativar tema escuro"`. Before mount: same-size disabled placeholder button with `aria-hidden`, no layout shift. Stored `theme="system"` is coerced to `dark`.
 
 ### Shell grid (`GeneratorShell`)
