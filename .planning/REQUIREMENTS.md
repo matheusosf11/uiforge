@@ -12,7 +12,7 @@
 - [x] **GEN-03**: App generates a single self-contained React + Tailwind component via Google Gemini using the Vercel AI SDK
 - [ ] **GEN-04**: Generated code streams token-by-token into the code view in real time
 - [ ] **GEN-05**: User can stop an in-progress generation
-- [ ] **GEN-06**: App extracts clean, runnable code from the model output (strips markdown fences and prose)
+- [x] **GEN-06**: App extracts clean, runnable code from the model output (strips markdown fences and prose)
 
 ### Live Preview
 
@@ -75,7 +75,7 @@ Mapped during roadmap creation (2026-10-15).
 | GEN-03 | Phase 1 | Complete |
 | GEN-04 | Phase 1 | Pending |
 | GEN-05 | Phase 1 | Pending |
-| GEN-06 | Phase 1 | Pending |
+| GEN-06 | Phase 1 | Complete |
 | EDIT-01 | Phase 1 | Pending |
 | PREV-01 | Phase 2 | Pending |
 | PREV-02 | Phase 2 | Pending |

@@ -43,7 +43,7 @@ Plans:
 **Wave 2** *(blocked on Wave 1 completion)*
 
 - [x] 01-02-PLAN.md — Streaming backend: lib/ai/model.ts + prompt.ts + app/api/generate/route.ts (streamText, Node runtime, maxDuration, text stream protocol) (Wave 2)
-- [ ] 01-03-PLAN.md — Code extraction: lib/parse-code.ts streaming-safe/idempotent fence+prose stripping + Vitest fixtures (Wave 2)
+- [x] 01-03-PLAN.md — Code extraction: lib/parse-code.ts streaming-safe/idempotent fence+prose stripping + Vitest fixtures (Wave 2)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -124,7 +124,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation & Streaming Generation | 2/4 | In Progress|  |
+| 1. Foundation & Streaming Generation | 3/4 | In Progress|  |
 | 2. Sandboxed Live Preview | 0/2 | Not started | - |
 | 3. Export, Examples & Accessible UX | 0/3 | Not started | - |
 | 4. Quality Gate & Deploy | 0/3 | Not started | - |
