@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Highlight, themes } from "prism-react-renderer";
 import { Check, Copy, Download } from "lucide-react";
+import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { componentFilename } from "@/lib/download-filename";
 import { cn } from "@/lib/utils";
@@ -19,6 +20,15 @@ export function CodeView({
   const preRef = useRef<HTMLPreElement>(null);
   const timeoutRef = useRef<number | null>(null);
   const [copyState, setCopyState] = useState<CopyState>("idle");
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const prismTheme =
+    mounted && resolvedTheme === "light" ? themes.nightOwlLight : themes.nightOwl;
 
   useEffect(() => {
     return () => {
@@ -102,7 +112,7 @@ export function CodeView({
         </div>
       </div>
       {code ? (
-        <Highlight code={code} language="tsx" theme={themes.nightOwl}>
+        <Highlight code={code} language="tsx" theme={prismTheme}>
           {({ className, style, tokens, getLineProps, getTokenProps }) => (
             <pre
               ref={preRef}

@@ -29,6 +29,7 @@ export function buildPreviewSrcdoc(code: string): string {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.3/dist/index.global.js"></script>
     <style>
       html, body, #root { margin: 0; min-height: 100%; background: #fff; color: #0f172a; }

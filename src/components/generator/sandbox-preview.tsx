@@ -53,6 +53,7 @@ export function SandboxPreview({ code }: { code: string }) {
         title="Live preview"
         sandbox="allow-scripts"
         srcDoc={srcDoc}
+        style={{ colorScheme: "light dark" }}
         className="h-80 w-full max-w-full rounded-lg border border-border bg-white"
       />
     </section>
