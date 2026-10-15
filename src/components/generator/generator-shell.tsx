@@ -1,10 +1,24 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { useCompletion } from "@ai-sdk/react";
 import { CodeView } from "@/components/generator/code-view";
 import { PromptForm } from "@/components/generator/prompt-form";
 import { parseCode } from "@/lib/parse-code";
+
+const SandboxPreview = dynamic(
+  () =>
+    import("@/components/generator/sandbox-preview").then(
+      (m) => m.SandboxPreview,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <p className="text-sm text-muted-foreground">Gerando preview…</p>
+    ),
+  },
+);
 
 const FALLBACK_ERROR = "Falha ao gerar o componente. Tente novamente.";
 
@@ -24,6 +38,19 @@ export function GeneratorShell() {
 
   const parsed = useMemo(() => parseCode(completion), [completion]);
   const visibleError = error?.message || submitError;
+  const [previewCode, setPreviewCode] = useState<string | null>(null);
+  const wasLoading = useRef(false);
+
+  useEffect(() => {
+    if (isLoading) {
+      wasLoading.current = true;
+      return;
+    }
+    if (wasLoading.current) {
+      wasLoading.current = false;
+      setPreviewCode(parsed.trim() ? parsed : null);
+    }
+  }, [isLoading, parsed]);
 
   function handleSubmit() {
     const prompt = input.trim();
@@ -54,14 +81,16 @@ export function GeneratorShell() {
 
   return (
     <div className="grid min-h-0 flex-1 gap-4 md:grid-cols-2">
-      <PromptForm
-        value={input}
-        onChange={(value) => setInput(value)}
-        onSubmit={handleSubmit}
-        onStop={handleStop}
-        isLoading={isLoading}
-      />
-      <div className="flex min-h-64 flex-col gap-3">
+      <div className="order-3 md:order-1">
+        <PromptForm
+          value={input}
+          onChange={(value) => setInput(value)}
+          onSubmit={handleSubmit}
+          onStop={handleStop}
+          isLoading={isLoading}
+        />
+      </div>
+      <div className="order-1 md:order-2 flex min-h-64 flex-col gap-3">
         {visibleError ? (
           <p
             role="alert"
@@ -70,6 +99,31 @@ export function GeneratorShell() {
             {visibleError}
           </p>
         ) : null}
+        {isLoading ? (
+          <section
+            aria-label="Live preview"
+            className="flex min-h-64 flex-col rounded-xl border border-dashed border-border bg-muted/30 p-4"
+          >
+            <h2 className="mb-2 text-sm font-medium text-muted-foreground">
+              Preview
+            </h2>
+            <p className="text-sm text-muted-foreground">Gerando preview…</p>
+          </section>
+        ) : previewCode ? (
+          <SandboxPreview code={previewCode} />
+        ) : (
+          <section
+            aria-label="Live preview"
+            className="flex min-h-64 flex-col rounded-xl border border-dashed border-border bg-muted/30 p-4"
+          >
+            <h2 className="mb-2 text-sm font-medium text-muted-foreground">
+              Preview
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              O preview aparece aqui depois de gerar.
+            </p>
+          </section>
+        )}
         <div className="min-h-0 flex-1">
           <CodeView code={parsed} />
         </div>
