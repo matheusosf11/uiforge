@@ -15,13 +15,13 @@ A user types a prompt and gets working, previewable React + Tailwind component c
 - ✓ User can describe a UI component in a text prompt and submit it — Phase 1
 - ✓ App generates a single self-contained React + Tailwind component via Google Gemini (free tier) using the Vercel AI SDK — Phase 1
 - ✓ Generated code streams token-by-token into a code view in real time — Phase 1
+- ✓ User can copy and download the generated code — Validated in Phase 3: Export, Examples & Accessible UX
+- ✓ User can pick from a gallery of example prompts to seed generation — Validated in Phase 3: Export, Examples & Accessible UX
+- ✓ UI supports light/dark theme, is responsive, and handles loading/empty/error states accessibly — Validated in Phase 3 (human UAT pending in 03-HUMAN-UAT.md)
 
 ### Active
 
 - [ ] Generated component renders live in a secure sandboxed preview (Sandpack iframe)
-- [ ] User can copy and download the generated code
-- [ ] User can pick from a gallery of example prompts to seed generation
-- [ ] UI supports light/dark theme, is responsive, and handles loading/empty/error states accessibly
 - [ ] Project is covered by unit tests (Vitest) and an e2e test (Playwright), runs in CI (GitHub Actions), and deploys publicly on Vercel
 
 ### Out of Scope
@@ -78,4 +78,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-15 after initialization*
+*Last updated: 2026-10-15 after Phase 3 completion*
