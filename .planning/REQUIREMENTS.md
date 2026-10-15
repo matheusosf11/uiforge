@@ -8,7 +8,7 @@
 ### Prompt & Generation
 
 - [x] **GEN-01**: User can type a natural-language description of a UI component and submit it
-- [ ] **GEN-02**: User can seed the prompt from a gallery of example prompts
+- [x] **GEN-02**: User can seed the prompt from a gallery of example prompts
 - [x] **GEN-03**: App generates a single self-contained React + Tailwind component via Google Gemini using the Vercel AI SDK
 - [x] **GEN-04**: Generated code streams token-by-token into the code view in real time
 - [x] **GEN-05**: User can stop an in-progress generation
@@ -23,8 +23,8 @@
 ### Code & Export
 
 - [x] **EDIT-01**: User can view the generated code in a syntax-highlighted editor
-- [ ] **EDIT-02**: User can copy the generated code to the clipboard
-- [ ] **EDIT-03**: User can download the generated code as a file
+- [x] **EDIT-02**: User can copy the generated code to the clipboard
+- [x] **EDIT-03**: User can download the generated code as a file
 
 ### UX & Accessibility
 
@@ -80,9 +80,9 @@ Mapped during roadmap creation (2026-10-15).
 | PREV-01 | Phase 2 | Complete |
 | PREV-02 | Phase 2 | Complete |
 | PREV-03 | Phase 2 | Complete |
-| GEN-02 | Phase 3 | Pending |
-| EDIT-02 | Phase 3 | Pending |
-| EDIT-03 | Phase 3 | Pending |
+| GEN-02 | Phase 3 | Complete |
+| EDIT-02 | Phase 3 | Complete |
+| EDIT-03 | Phase 3 | Complete |
 | UX-01 | Phase 3 | Pending |
 | UX-02 | Phase 3 | Pending |
 | UX-03 | Phase 3 | Pending |
