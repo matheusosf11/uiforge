@@ -4,7 +4,7 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Phase 3 UI-SPEC approved
-last_updated: "2026-10-15T21:54:02.605Z"
+last_updated: "2026-10-15T21:54:09.106Z"
 last_activity: 2026-10-15
 progress:
   total_phases: 4
@@ -59,6 +59,7 @@ Progress: [█████████░] 89%
 | Phase 02 P01 | 5 min | 3 tasks | 8 files |
 | Phase 02 P02 | 3min | 2 tasks | 4 files |
 | Phase 03 P01 | 15min | 3 tasks | 8 files |
+| Phase 03 P02 | 15min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -86,6 +87,7 @@ Recent decisions affecting current work:
 - [Phase 02]: Pinned jsDelivr @tailwindcss/browser@4.3.3 on SandpackProvider.externalResources; did not install the host package or use cdn.tailwindcss.com — CONTEXT locked CDN; RESEARCH pins 4.3.3; v3 Play CDN will not emit v4 utilities
 - [Phase 02]: hasDefaultExport uses /export default/ regex; export as default is an accepted miss and still mounts Sandpack — Lightweight regex per RESEARCH Open Question 3; still mount so overlay is not blank
 - [Phase 02]: PreviewErrorBanner lives inside SandpackProvider; overlay stays on; missing-default Portuguese alert does not skip the iframe — useErrorMessage must be under SandpackProvider; host ErrorBoundary cannot catch iframe errors
+- [Phase 03]: Phase 3 Plan 02: theme=system coagido para dark; paineis de abas sempre montados via max-md:hidden
 
 ### Pending Todos
 
