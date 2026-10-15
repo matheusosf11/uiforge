@@ -82,4 +82,15 @@ describe("parseCode", () => {
   it("returns an empty string for empty input", () => {
     expect(parseCode("")).toBe("");
   });
+
+  it("does not treat inner markdown fences in bare TSX as wrappers", () => {
+    const src = `export default function Docs() {
+  return (
+    <pre>{\`\`\`tsx
+const x = 1
+\`\`\`}</pre>
+  );
+}`;
+    expect(parseCode(src)).toBe(src);
+  });
 });

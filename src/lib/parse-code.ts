@@ -1,9 +1,20 @@
+const BARE_CODE_START =
+  /^(?:['"]use (?:client|server)['"];?\s*)?(?:import\s|export\s|function\s|const\s|let\s|var\s|type\s|interface\s|class\s|\/\*|\/\/)/;
+
 /**
  * Streaming-safe extractor for LLM code output.
- * Strips markdown fences and surrounding prose; never throws on partial input.
+ * Unwraps a markdown fence only when the model wrapped the answer.
+ * Bare TSX that happens to contain ``` (e.g. a markdown editor) is left intact.
+ * Never throws on partial / mid-stream input.
  */
 export function parseCode(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+
+  if (BARE_CODE_START.test(trimmed) && !trimmed.startsWith("```")) {
+    return trimmed;
+  }
+
   const match = raw.match(/```(?:[a-zA-Z]+)?\s*\n?([\s\S]*?)(?:```|$)/);
-  const body = match?.[1] ?? raw;
-  return body.trim();
+  return (match?.[1] ?? raw).trim();
 }

@@ -10,6 +10,7 @@ const FALLBACK_ERROR = "Falha ao gerar o componente. Tente novamente.";
 
 export function GeneratorShell() {
   const stoppedRef = useRef(false);
+  const inFlightRef = useRef(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const { completion, input, setInput, complete, isLoading, stop, error } =
@@ -26,8 +27,9 @@ export function GeneratorShell() {
 
   function handleSubmit() {
     const prompt = input.trim();
-    if (!prompt || isLoading) return;
+    if (!prompt || isLoading || inFlightRef.current) return;
     stoppedRef.current = false;
+    inFlightRef.current = true;
     setSubmitError(null);
     void (async () => {
       try {
@@ -39,6 +41,8 @@ export function GeneratorShell() {
         setSubmitError(
           err instanceof Error ? err.message : FALLBACK_ERROR,
         );
+      } finally {
+        inFlightRef.current = false;
       }
     })();
   }
