@@ -128,7 +128,7 @@ export function GeneratorShell() {
           </section>
         )}
         <div className="min-h-0 flex-1">
-          <CodeView code={parsed} />
+          <CodeView code={parsed} busy={busy} />
         </div>
       </div>
     </div>
