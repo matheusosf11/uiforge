@@ -18,6 +18,13 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
+  if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+    return new Response(
+      "Missing GOOGLE_GENERATIVE_AI_API_KEY. Add it to .env.local (see .env.example).",
+      { status: 500 },
+    );
+  }
+
   const result = streamText({ model, system: SYSTEM_PROMPT, prompt: parsed.prompt });
   // Plain text stream protocol (not the UI-message protocol).
   return result.toTextStreamResponse();
