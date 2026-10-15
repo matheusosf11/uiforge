@@ -30,8 +30,8 @@
 
 - [x] **UX-01**: User can toggle light/dark theme (persisted)
 - [x] **UX-02**: UI is responsive across mobile and desktop
-- [ ] **UX-03**: UI communicates loading, empty, and error states accessibly (aria-live for streaming)
-- [ ] **UX-04**: App surfaces a friendly error with retry when the API fails or rate-limits (429)
+- [x] **UX-03**: UI communicates loading, empty, and error states accessibly (aria-live for streaming)
+- [x] **UX-04**: App surfaces a friendly error with retry when the API fails or rate-limits (429)
 
 ### Quality & Delivery
 
@@ -85,8 +85,8 @@ Mapped during roadmap creation (2026-10-15).
 | EDIT-03 | Phase 3 | Complete |
 | UX-01 | Phase 3 | Complete |
 | UX-02 | Phase 3 | Complete |
-| UX-03 | Phase 3 | Pending |
-| UX-04 | Phase 3 | Pending |
+| UX-03 | Phase 3 | Complete |
+| UX-04 | Phase 3 | Complete |
 | QUAL-01 | Phase 4 | Pending |
 | QUAL-02 | Phase 4 | Pending |
 | QUAL-03 | Phase 4 | Pending |
