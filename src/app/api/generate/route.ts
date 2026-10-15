@@ -77,14 +77,16 @@ export async function POST(req: Request) {
             return;
           }
           if (value.type === "error" || value.type === "abort") {
-            // Status is already sent; close gracefully (accepted limitation).
-            controller.close();
+            // Status 200 is already sent: error the body so the client's
+            // stream read rejects (onError -> friendly alert + retry) instead
+            // of presenting truncated code as a successful "Pronto".
             void reader.cancel().catch(() => {});
+            controller.error(new Error("generate_failed"));
             return;
           }
         }
       } catch {
-        controller.close();
+        controller.error(new Error("generate_failed"));
       }
     },
     cancel() {

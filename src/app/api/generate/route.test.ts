@@ -111,15 +111,16 @@ describe("POST /api/generate", () => {
     expect(res.status).toBe(429);
   });
 
-  it("erro depois do primeiro delta fecha sem lancar", async () => {
+  it("erro depois do primeiro delta sinaliza falha no body", async () => {
     state.parts = [
       { type: "text-delta", text: "ab" },
+      { type: "text-delta", text: "cd" },
       { type: "error", error: new Error("late") },
     ];
     const res = await POST(req({ prompt: "x" }));
     expect(res.status).toBe(200);
-    expect(await res.text()).toBe("ab");
-  });
+    await expect(res.text()).rejects.toThrow("generate_failed");
+  }, 1000);
 
   it("prompt invalido continua 400", async () => {
     const res = await POST(req({ prompt: "" }));

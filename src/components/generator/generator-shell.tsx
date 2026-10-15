@@ -67,7 +67,9 @@ export function GeneratorShell() {
     if (wasLoading.current) {
       wasLoading.current = false;
       setInFlight(false);
-      setPreviewCode(parsed.trim() ? parsed : null);
+      // A mid-stream failure (body errored after the first token) leaves
+      // truncated code in `completion`; don't promote it to the preview.
+      setPreviewCode(!failedRef.current && parsed.trim() ? parsed : null);
     }
   }, [isLoading, parsed]);
 
