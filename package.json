@@ -13,6 +13,7 @@
     "@ai-sdk/google": "^4.0.96",
     "@ai-sdk/react": "^4.0.145",
     "@base-ui/react": "^1.9.0",
+    "@codesandbox/sandpack-react": "^2.20.0",
     "ai": "^7.0.141",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
