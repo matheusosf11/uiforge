@@ -26,13 +26,22 @@ export async function POST(req: Request) {
     );
   }
 
-  const result = streamText({ model, system: SYSTEM_PROMPT, prompt: parsed.prompt });
+  const result = streamText({
+    model,
+    system: SYSTEM_PROMPT,
+    prompt: parsed.prompt,
+    // Client disconnect/"Parar" cancels the provider request (and quota use).
+    abortSignal: req.signal,
+  });
 
   // Peek the full stream until the first text delta so a provider failure
   // (e.g. 429) can be reported as a real HTTP status before any byte is sent.
   const reader = result.fullStream.getReader();
   const encoder = new TextEncoder();
   let firstDelta: string | null = null;
+  // Early returns below never hand the reader to a response body, so cancel
+  // it explicitly to stop consuming the provider stream.
+  const cancelReader = () => void reader.cancel().catch(() => {});
 
   try {
     while (firstDelta === null) {
@@ -41,16 +50,19 @@ export async function POST(req: Request) {
       if (value.type === "text-delta") {
         firstDelta = value.text;
       } else if (value.type === "error") {
+        cancelReader();
         return failureResponse(value.error);
       } else if (value.type === "abort") {
         break;
       }
     }
   } catch (error) {
+    cancelReader();
     return failureResponse(error);
   }
 
   if (firstDelta === null) {
+    cancelReader();
     return new Response("generate_failed", { status: 502 });
   }
 
@@ -80,7 +92,7 @@ export async function POST(req: Request) {
             // Status 200 is already sent: error the body so the client's
             // stream read rejects (onError -> friendly alert + retry) instead
             // of presenting truncated code as a successful "Pronto".
-            void reader.cancel().catch(() => {});
+            cancelReader();
             controller.error(new Error("generate_failed"));
             return;
           }
@@ -90,7 +102,7 @@ export async function POST(req: Request) {
       }
     },
     cancel() {
-      void reader.cancel().catch(() => {});
+      cancelReader();
     },
   });
 
