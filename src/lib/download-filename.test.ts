@@ -26,6 +26,12 @@ describe("componentFilename", () => {
     );
   });
 
+  it("aceita alias sem ponto e virgula no fim da linha", () => {
+    expect(
+      componentFilename("const Card = () => null\nexport default Card\n"),
+    ).toBe("Card.tsx");
+  });
+
   it("cai em Component.tsx para casos sem nome claro", () => {
     expect(componentFilename("export default function () {}")).toBe(
       "Component.tsx",
@@ -33,6 +39,12 @@ describe("componentFilename", () => {
     expect(componentFilename("export default memo(Button)")).toBe(
       "Component.tsx",
     );
+    expect(componentFilename("export default React.memo(Card);")).toBe(
+      "Component.tsx",
+    );
+    expect(
+      componentFilename("export default Object.assign(Root, { Item });"),
+    ).toBe("Component.tsx");
     expect(componentFilename("")).toBe("Component.tsx");
     expect(componentFilename("const A = 1;")).toBe("Component.tsx");
   });

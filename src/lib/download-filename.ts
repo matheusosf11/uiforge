@@ -1,7 +1,9 @@
 const DECLARED =
   /export\s+default\s+(?:async\s+)?function\s+([A-Za-z_$][\w$]*)/;
 const CLASS_NAME = /export\s+default\s+class\s+([A-Za-z_$][\w$]*)/;
-const ALIAS = /export\s+default\s+([A-Z][\w$]*)\s*;?/;
+// The identifier must end the statement, so `export default React.memo(Card)`
+// does not become "React.tsx".
+const ALIAS = /export\s+default\s+([A-Z][\w$]*)\s*(?:;|$)/m;
 
 const FALLBACK = "Component.tsx";
 
