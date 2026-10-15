@@ -9,7 +9,7 @@
 
 - [ ] **GEN-01**: User can type a natural-language description of a UI component and submit it
 - [ ] **GEN-02**: User can seed the prompt from a gallery of example prompts
-- [ ] **GEN-03**: App generates a single self-contained React + Tailwind component via Google Gemini using the Vercel AI SDK
+- [x] **GEN-03**: App generates a single self-contained React + Tailwind component via Google Gemini using the Vercel AI SDK
 - [ ] **GEN-04**: Generated code streams token-by-token into the code view in real time
 - [ ] **GEN-05**: User can stop an in-progress generation
 - [ ] **GEN-06**: App extracts clean, runnable code from the model output (strips markdown fences and prose)
@@ -72,7 +72,7 @@ Mapped during roadmap creation (2026-10-15).
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | GEN-01 | Phase 1 | Pending |
-| GEN-03 | Phase 1 | Pending |
+| GEN-03 | Phase 1 | Complete |
 | GEN-04 | Phase 1 | Pending |
 | GEN-05 | Phase 1 | Pending |
 | GEN-06 | Phase 1 | Pending |

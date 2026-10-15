@@ -42,12 +42,17 @@ After completing setup:
 # Key is present locally and not committed
 test -f .env.local && grep -q '^GOOGLE_GENERATIVE_AI_API_KEY=.\+' .env.local
 git check-ignore -v .env.local
+
+# After 01-02: stream a component from the running dev server
+npm run dev
+curl -N -X POST http://localhost:3000/api/generate -H "content-type: application/json" -d '{"prompt":"a button"}'
 ```
 
 Expected results:
 - `.env.local` exists and contains a non-empty key
 - `git check-ignore` reports `.env*.local` (file is ignored)
 - `npm run build` still succeeds (the key is not required at build time)
+- With the key set, `curl -N` streams TSX tokens (not a JSON chat payload)
 
 ---
 
