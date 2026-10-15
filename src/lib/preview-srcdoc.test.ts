@@ -33,6 +33,13 @@ describe("buildPreviewSrcdoc", () => {
     expect(buildPreviewSrcdoc(SAMPLE)).not.toContain("cdn.tailwindcss.com");
   });
 
+  it("declares color-scheme light dark without forcing light only", () => {
+    const srcdoc = buildPreviewSrcdoc(SAMPLE);
+    expect(srcdoc).toContain('<meta name="color-scheme" content="light dark"');
+    expect(srcdoc).toContain("background: #fff");
+    expect(srcdoc).not.toContain("color-scheme: light;");
+  });
+
   it("does not execute generated code on the host document", () => {
     const srcdoc = buildPreviewSrcdoc(SAMPLE);
     expect(srcdoc).toContain("const __Generated = function Button()");
