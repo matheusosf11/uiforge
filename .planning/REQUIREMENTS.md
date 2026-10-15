@@ -16,7 +16,7 @@
 
 ### Live Preview
 
-- [ ] **PREV-01**: Generated component renders live inside a sandboxed Sandpack iframe (never in the host page)
+- [x] **PREV-01**: Generated component renders live inside a sandboxed Sandpack iframe (never in the host page)
 - [ ] **PREV-02**: Tailwind styling applies correctly inside the preview
 - [ ] **PREV-03**: Preview shows a clear error state when generated code fails to render
 
@@ -77,7 +77,7 @@ Mapped during roadmap creation (2026-10-15).
 | GEN-05 | Phase 1 | Complete |
 | GEN-06 | Phase 1 | Complete |
 | EDIT-01 | Phase 1 | Complete |
-| PREV-01 | Phase 2 | Pending |
+| PREV-01 | Phase 2 | Complete |
 | PREV-02 | Phase 2 | Pending |
 | PREV-03 | Phase 2 | Pending |
 | GEN-02 | Phase 3 | Pending |
