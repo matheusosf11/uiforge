@@ -63,12 +63,16 @@ Plans:
   2. Tailwind styling (including responsive and dark variants) applies correctly inside the preview
   3. When generated code fails to render, the preview shows a clear, non-blank error state
 
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
+**Wave 1**
 
-- [ ] 02-01: SandboxPreview — dynamic (ssr:false) Sandpack, render on stream-finish, SSR CSS injection (getSandpackCssText/useServerInsertedHTML)
-- [ ] 02-02: Tailwind-in-sandbox via externalResources (@tailwindcss/browser@4) + preview error boundary/error state
+- [ ] 02-01-PLAN.md — SandboxPreview + CSS injection + mount-on-finish (PREV-01)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 02-02-PLAN.md — Tailwind-in-sandbox via externalResources + preview error state (PREV-02, PREV-03)
 
 **UI hint**: yes
 
@@ -124,7 +128,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation & Streaming Generation | 4/4 | Complete   | 2026-10-15 |
+| 1. Foundation & Streaming Generation | 4/4 | Complete    | 2026-10-15 |
 | 2. Sandboxed Live Preview | 0/2 | Not started | - |
 | 3. Export, Examples & Accessible UX | 0/3 | Not started | - |
 | 4. Quality Gate & Deploy | 0/3 | Not started | - |
