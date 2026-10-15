@@ -19,3 +19,7 @@ export function buildSandpackFiles(code: string): {
     [APP_PATH]: { code: APP_WRAPPER, hidden: true },
   };
 }
+
+export function hasDefaultExport(code: string): boolean {
+  return /export\s+default/.test(code);
+}

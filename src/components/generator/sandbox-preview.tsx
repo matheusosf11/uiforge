@@ -5,7 +5,8 @@ import {
   SandpackPreview,
   SandpackProvider,
 } from "@codesandbox/sandpack-react";
-import { buildSandpackFiles } from "@/lib/sandpack-files";
+import { PreviewErrorBanner } from "@/components/generator/preview-error";
+import { buildSandpackFiles, hasDefaultExport } from "@/lib/sandpack-files";
 
 const TAILWIND_BROWSER =
   "https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.3";
@@ -19,6 +20,14 @@ export function SandboxPreview({ code }: { code: string }) {
       <h2 className="mb-2 text-sm font-medium text-muted-foreground">
         Preview
       </h2>
+      {!hasDefaultExport(code) ? (
+        <p
+          role="alert"
+          className="mb-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+        >
+          O código gerado não exporta um componente padrão.
+        </p>
+      ) : null}
       <SandpackProvider
         key={code}
         template="react-ts"
@@ -31,9 +40,11 @@ export function SandboxPreview({ code }: { code: string }) {
           externalResources: [TAILWIND_BROWSER],
         }}
       >
+        <PreviewErrorBanner />
         <SandpackLayout className="min-h-64 flex-1">
           <SandpackPreview
             showOpenInCodeSandbox={false}
+            showSandpackErrorOverlay
             showNavigator={false}
           />
         </SandpackLayout>
