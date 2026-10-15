@@ -14,7 +14,7 @@ UIForge takes a user from a natural-language prompt to a live, sandboxed React +
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation & Streaming Generation** - Prompt → clean React/Tailwind code streaming live into a code view (completed 2026-10-15)
-- [ ] **Phase 2: Sandboxed Live Preview** - Generated code renders safely in an isolated Sandpack iframe with Tailwind
+- [x] **Phase 2: Sandboxed Live Preview** - Generated code renders safely in an isolated Sandpack iframe with Tailwind (completed 2026-10-15)
 - [ ] **Phase 3: Export, Examples & Accessible UX** - Copy/download, example gallery, theme, responsive layout, accessible states & error recovery
 - [ ] **Phase 4: Quality Gate & Deploy** - Tests, CI, public Vercel deploy, and documentation
 
@@ -72,7 +72,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 02-02-PLAN.md — Tailwind-in-sandbox via externalResources + preview error state (PREV-02, PREV-03)
+- [x] 02-02-PLAN.md — Tailwind-in-sandbox via externalResources + preview error state (PREV-02, PREV-03)
 
 **UI hint**: yes
 
@@ -129,6 +129,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation & Streaming Generation | 4/4 | Complete    | 2026-10-15 |
-| 2. Sandboxed Live Preview | 1/2 | In Progress|  |
+| 2. Sandboxed Live Preview | 2/2 | Complete   | 2026-10-15 |
 | 3. Export, Examples & Accessible UX | 0/3 | Not started | - |
 | 4. Quality Gate & Deploy | 0/3 | Not started | - |
