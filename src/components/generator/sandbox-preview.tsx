@@ -7,6 +7,9 @@ import {
 } from "@codesandbox/sandpack-react";
 import { buildSandpackFiles } from "@/lib/sandpack-files";
 
+const TAILWIND_BROWSER =
+  "https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.3";
+
 export function SandboxPreview({ code }: { code: string }) {
   return (
     <section
@@ -25,6 +28,7 @@ export function SandboxPreview({ code }: { code: string }) {
           autorun: true,
           initMode: "immediate",
           recompileMode: "delayed",
+          externalResources: [TAILWIND_BROWSER],
         }}
       >
         <SandpackLayout className="min-h-64 flex-1">
