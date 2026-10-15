@@ -4,6 +4,7 @@ import {
   APP_WRAPPER,
   COMPONENT_PATH,
   buildSandpackFiles,
+  hasDefaultExport,
 } from "./sandpack-files";
 
 const SAMPLE = `export default function Button() {
@@ -34,5 +35,25 @@ describe("buildSandpackFiles", () => {
     const files = buildSandpackFiles(SAMPLE);
     expect(files).not.toHaveProperty("/src/App.tsx");
     expect(files).not.toHaveProperty("/index.tsx");
+  });
+});
+
+describe("hasDefaultExport", () => {
+  it("is true for a default-exported function", () => {
+    expect(
+      hasDefaultExport("export default function X(){return null}"),
+    ).toBe(true);
+  });
+
+  it("is true for export default X", () => {
+    expect(hasDefaultExport("export default X")).toBe(true);
+  });
+
+  it("is false for a named-only export", () => {
+    expect(hasDefaultExport("export function X(){return null}")).toBe(false);
+  });
+
+  it("is false for empty source", () => {
+    expect(hasDefaultExport("")).toBe(false);
   });
 });
