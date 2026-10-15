@@ -7,11 +7,11 @@
 
 ### Prompt & Generation
 
-- [ ] **GEN-01**: User can type a natural-language description of a UI component and submit it
+- [x] **GEN-01**: User can type a natural-language description of a UI component and submit it
 - [ ] **GEN-02**: User can seed the prompt from a gallery of example prompts
 - [x] **GEN-03**: App generates a single self-contained React + Tailwind component via Google Gemini using the Vercel AI SDK
-- [ ] **GEN-04**: Generated code streams token-by-token into the code view in real time
-- [ ] **GEN-05**: User can stop an in-progress generation
+- [x] **GEN-04**: Generated code streams token-by-token into the code view in real time
+- [x] **GEN-05**: User can stop an in-progress generation
 - [x] **GEN-06**: App extracts clean, runnable code from the model output (strips markdown fences and prose)
 
 ### Live Preview
@@ -22,7 +22,7 @@
 
 ### Code & Export
 
-- [ ] **EDIT-01**: User can view the generated code in a syntax-highlighted editor
+- [x] **EDIT-01**: User can view the generated code in a syntax-highlighted editor
 - [ ] **EDIT-02**: User can copy the generated code to the clipboard
 - [ ] **EDIT-03**: User can download the generated code as a file
 
@@ -71,12 +71,12 @@ Mapped during roadmap creation (2026-10-15).
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| GEN-01 | Phase 1 | Pending |
+| GEN-01 | Phase 1 | Complete |
 | GEN-03 | Phase 1 | Complete |
-| GEN-04 | Phase 1 | Pending |
-| GEN-05 | Phase 1 | Pending |
+| GEN-04 | Phase 1 | Complete |
+| GEN-05 | Phase 1 | Complete |
 | GEN-06 | Phase 1 | Complete |
-| EDIT-01 | Phase 1 | Pending |
+| EDIT-01 | Phase 1 | Complete |
 | PREV-01 | Phase 2 | Pending |
 | PREV-02 | Phase 2 | Pending |
 | PREV-03 | Phase 2 | Pending |
