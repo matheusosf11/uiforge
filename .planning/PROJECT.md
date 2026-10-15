@@ -12,13 +12,12 @@ A user types a prompt and gets working, previewable React + Tailwind component c
 
 ### Validated
 
-(None yet — ship to validate)
+- ✓ User can describe a UI component in a text prompt and submit it — Phase 1
+- ✓ App generates a single self-contained React + Tailwind component via Google Gemini (free tier) using the Vercel AI SDK — Phase 1
+- ✓ Generated code streams token-by-token into a code view in real time — Phase 1
 
 ### Active
 
-- [ ] User can describe a UI component in a text prompt and submit it
-- [ ] App generates a single self-contained React + Tailwind component via Google Gemini (free tier) using the Vercel AI SDK
-- [ ] Generated code streams token-by-token into a code view in real time
 - [ ] Generated component renders live in a secure sandboxed preview (Sandpack iframe)
 - [ ] User can copy and download the generated code
 - [ ] User can pick from a gallery of example prompts to seed generation
