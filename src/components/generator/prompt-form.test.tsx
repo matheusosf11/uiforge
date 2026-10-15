@@ -42,6 +42,20 @@ describe("PromptForm", () => {
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 
+  it("limits the prompt to the server max length and shows a counter", async () => {
+    const user = userEvent.setup();
+    render(<Harness onSubmit={vi.fn()} onStop={vi.fn()} />);
+
+    const textarea = screen.getByRole("textbox", {
+      name: "Prompt",
+    }) as HTMLTextAreaElement;
+    expect(textarea.maxLength).toBe(2000);
+    expect(screen.getByText("0/2000 caracteres")).toBeTruthy();
+
+    await user.type(textarea, "abc");
+    expect(screen.getByText("3/2000 caracteres")).toBeTruthy();
+  });
+
   describe("example chips", () => {
     const BOTAO = "botão primário com ícone";
 

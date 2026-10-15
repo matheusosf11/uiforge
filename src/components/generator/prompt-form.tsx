@@ -5,6 +5,7 @@ import type { FormEvent, KeyboardEvent } from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { EXAMPLE_PROMPTS } from "@/lib/example-prompts";
+import { MAX_PROMPT_LENGTH } from "@/lib/prompt-limits";
 import { cn } from "@/lib/utils";
 
 type PromptFormProps = {
@@ -63,9 +64,17 @@ export function PromptForm({
           onChange={(event) => onChange(event.target.value)}
           onKeyDown={handleKeyDown}
           disabled={isLoading}
+          maxLength={MAX_PROMPT_LENGTH}
+          aria-describedby="prompt-char-count"
           placeholder="Descreva um componente de UI… (⌘/Ctrl+Enter para gerar)"
           className="min-h-32 flex-1 resize-none"
         />
+        <p
+          id="prompt-char-count"
+          className="mt-1 text-right text-xs text-muted-foreground"
+        >
+          {value.length}/{MAX_PROMPT_LENGTH} caracteres
+        </p>
         <div className="mt-3 flex flex-wrap gap-2">
           {EXAMPLE_PROMPTS.map((e) => (
             <button

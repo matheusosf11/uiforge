@@ -3,11 +3,12 @@ import { z } from "zod";
 import { model } from "@/lib/ai/model";
 import { SYSTEM_PROMPT } from "@/lib/ai/prompt";
 import { isRateLimitError } from "@/lib/generate-error";
+import { MAX_PROMPT_LENGTH } from "@/lib/prompt-limits";
 
 export const runtime = "nodejs";
 export const maxDuration = 60; // Vercel Hobby allows up to 300; prevents stream truncation (P5)
 
-const Body = z.object({ prompt: z.string().min(1).max(2000) });
+const Body = z.object({ prompt: z.string().min(1).max(MAX_PROMPT_LENGTH) });
 
 export async function POST(req: Request) {
   let parsed;
@@ -15,7 +16,7 @@ export async function POST(req: Request) {
     parsed = Body.parse(await req.json());
   } catch {
     return new Response(
-      "Invalid request: prompt must be a non-empty string of at most 2000 characters.",
+      `Invalid request: prompt must be a non-empty string of at most ${MAX_PROMPT_LENGTH} characters.`,
       { status: 400 },
     );
   }
