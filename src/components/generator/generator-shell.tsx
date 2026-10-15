@@ -2,9 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import { RotateCcw } from "lucide-react";
 import { useCompletion } from "@ai-sdk/react";
 import { CodeView } from "@/components/generator/code-view";
 import { PromptForm } from "@/components/generator/prompt-form";
+import { Button } from "@/components/ui/button";
+import {
+  friendlyGenerateError,
+  GENERIC_ERROR_MESSAGE,
+} from "@/lib/generate-error";
 import { parseCode } from "@/lib/parse-code";
 import { cn } from "@/lib/utils";
 
@@ -23,30 +29,33 @@ const SandboxPreview = dynamic(
 
 type Tab = "preview" | "code";
 
-const FALLBACK_ERROR = "Falha ao gerar o componente. Tente novamente.";
-
 export function GeneratorShell() {
   const stoppedRef = useRef(false);
+  const failedRef = useRef(false);
+  const lastPromptRef = useRef("");
   const [tab, setTab] = useState<Tab>("preview");
   const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({
     preview: null,
     code: null,
   });
   const [inFlight, setInFlight] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [friendly, setFriendly] = useState<string | null>(null);
+  const [finished, setFinished] = useState(false);
 
   const [prompt, setPrompt] = useState("");
-  const { completion, complete, isLoading, stop, error } = useCompletion({
+  const { completion, complete, isLoading, stop } = useCompletion({
     api: "/api/generate",
     streamProtocol: "text",
     onError(err) {
-      setSubmitError(err.message || FALLBACK_ERROR);
+      if (stoppedRef.current || err.name === "AbortError") return;
+      failedRef.current = true;
+      setFriendly(friendlyGenerateError(err));
     },
   });
 
   const busy = isLoading || inFlight;
   const parsed = useMemo(() => parseCode(completion), [completion]);
-  const visibleError = error?.message || submitError;
+  const status = busy ? "Gerando…" : finished ? "Pronto" : "";
   const [previewCode, setPreviewCode] = useState<string | null>(null);
   const wasLoading = useRef(false);
 
@@ -62,31 +71,49 @@ export function GeneratorShell() {
     }
   }, [isLoading, parsed]);
 
-  function handleSubmit() {
-    const nextPrompt = prompt.trim();
-    if (!nextPrompt || busy) return;
+  function send(text: string) {
+    if (!text || busy) return;
     stoppedRef.current = false;
+    failedRef.current = false;
+    lastPromptRef.current = text;
+    setFriendly(null);
+    setFinished(false);
     setInFlight(true);
-    setSubmitError(null);
     void (async () => {
       try {
-        const result = await complete(nextPrompt);
-        if (!stoppedRef.current && !(result ?? "").trim()) {
-          setSubmitError((current) => current ?? FALLBACK_ERROR);
+        const result = await complete(text);
+        if (stoppedRef.current) return;
+        if (!(result ?? "").trim()) {
+          failedRef.current = true;
+          setFriendly((current) => current ?? GENERIC_ERROR_MESSAGE);
+        } else if (!failedRef.current) {
+          setFinished(true);
         }
       } catch (err) {
-        setSubmitError(
-          err instanceof Error ? err.message : FALLBACK_ERROR,
-        );
+        if (stoppedRef.current || (err instanceof Error && err.name === "AbortError")) {
+          return;
+        }
+        failedRef.current = true;
+        setFriendly(friendlyGenerateError(err));
       } finally {
         setInFlight(false);
       }
     })();
   }
 
+  function handleSubmit() {
+    send(prompt.trim());
+  }
+
+  function retry() {
+    send(lastPromptRef.current);
+  }
+
   function handleStop() {
     stoppedRef.current = true;
     stop();
+    setFriendly(null);
+    setFinished(false);
     setInFlight(false);
   }
 
@@ -118,13 +145,29 @@ export function GeneratorShell() {
         />
       </div>
       <div className="order-1 flex min-h-64 min-w-0 flex-col gap-3 md:order-2">
-        {visibleError ? (
-          <p
-            role="alert"
-            className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-          >
-            {visibleError}
-          </p>
+        <p
+          aria-live="polite"
+          aria-atomic="true"
+          className="min-h-5 text-sm text-muted-foreground"
+        >
+          {status}
+        </p>
+        {friendly ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2">
+            <p role="alert" className="text-sm text-destructive">
+              {friendly}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="text-xs"
+              onClick={retry}
+              disabled={busy}
+            >
+              <RotateCcw /> Tentar de novo
+            </Button>
+          </div>
         ) : null}
         <div
           role="tablist"
