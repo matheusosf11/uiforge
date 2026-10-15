@@ -69,8 +69,12 @@ export function CodeView({
     const a = document.createElement("a");
     a.href = url;
     a.download = componentFilename(code);
+    // Attach before clicking (some Firefox versions ignore detached anchors)
+    // and revoke asynchronously so the download can start first (Safari).
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
   return (
