@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { EXAMPLE_PROMPTS } from "@/lib/example-prompts";
 import { cn } from "@/lib/utils";
 
 type PromptFormProps = {
@@ -21,6 +23,10 @@ export function PromptForm({
   isLoading,
 }: PromptFormProps) {
   const canSubmit = !isLoading && value.trim() !== "";
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selected = EXAMPLE_PROMPTS.find(
+    (e) => e.id === selectedId && e.prompt === value,
+  );
 
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (
@@ -29,6 +35,7 @@ export function PromptForm({
       canSubmit
     ) {
       event.preventDefault();
+      setSelectedId(null);
       onSubmit();
     }
   }
@@ -36,6 +43,7 @@ export function PromptForm({
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canSubmit) return;
+    setSelectedId(null);
     onSubmit();
   }
 
@@ -58,6 +66,30 @@ export function PromptForm({
           placeholder="Descreva um componente de UI… (⌘/Ctrl+Enter para gerar)"
           className="min-h-32 flex-1 resize-none"
         />
+        <div className="mt-3 flex flex-wrap gap-2">
+          {EXAMPLE_PROMPTS.map((e) => (
+            <button
+              key={e.id}
+              type="button"
+              title={e.prompt}
+              aria-label={`${e.label}: ${e.prompt}`}
+              aria-pressed={selected?.id === e.id}
+              disabled={isLoading}
+              onClick={() => {
+                setSelectedId(e.id);
+                onChange(e.prompt);
+              }}
+              className={cn(
+                buttonVariants({ variant: "outline", size: "sm" }),
+                "text-xs",
+                selected?.id === e.id &&
+                  "border-transparent bg-primary text-primary-foreground",
+              )}
+            >
+              {e.label}
+            </button>
+          ))}
+        </div>
         <div className="mt-3 flex items-center gap-2">
           <button
             type="submit"
