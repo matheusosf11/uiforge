@@ -38,7 +38,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 Plans:
 **Wave 1**
 
-- [ ] 01-01-PLAN.md — Scaffold Next.js 15 (App Router, src/, TS) + Tailwind v4 + shadcn/ui + next-themes base shell (Wave 1)
+- [x] 01-01-PLAN.md — Scaffold Next.js 15 (App Router, src/, TS) + Tailwind v4 + shadcn/ui + next-themes base shell (Wave 1)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -124,7 +124,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation & Streaming Generation | 0/4 | Not started | - |
+| 1. Foundation & Streaming Generation | 1/4 | In Progress|  |
 | 2. Sandboxed Live Preview | 0/2 | Not started | - |
 | 3. Export, Examples & Accessible UX | 0/3 | Not started | - |
 | 4. Quality Gate & Deploy | 0/3 | Not started | - |
