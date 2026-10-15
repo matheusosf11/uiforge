@@ -89,13 +89,20 @@ Plans:
   3. User can toggle a persisted light/dark theme, and the layout is responsive across mobile and desktop
   4. The UI communicates loading, empty, and error states accessibly (aria-live for streaming), and surfaces a friendly, retryable message when the API fails or rate-limits (429)
 
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
+**Wave 1**
 
-- [ ] 03-01: Example-prompt gallery + copy/download actions
-- [ ] 03-02: Theme toggle (persisted, no FOUC) + responsive layout + Preview⇄Code tabs
-- [ ] 03-03: Accessible loading/empty/error states (aria-live) + friendly 429/API error with retry
+- [ ] 03-01-PLAN.md — Example-prompt gallery (12 chips) + Copiar/Baixar no CodeView
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 03-02-PLAN.md — Theme toggle (persisted, binary) + CodeView/preview theming + responsive Preview⇄Código tabs
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 03-03-PLAN.md — Friendly 429/API error with retry (route fullStream peek) + aria-live status
 
 **UI hint**: yes
 
