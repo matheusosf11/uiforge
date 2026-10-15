@@ -24,18 +24,19 @@ const FALLBACK_ERROR = "Falha ao gerar o componente. Tente novamente.";
 
 export function GeneratorShell() {
   const stoppedRef = useRef(false);
-  const inFlightRef = useRef(false);
+  const [inFlight, setInFlight] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const { completion, input, setInput, complete, isLoading, stop, error } =
-    useCompletion({
-      api: "/api/generate",
-      streamProtocol: "text",
-      onError(err) {
-        setSubmitError(err.message || FALLBACK_ERROR);
-      },
-    });
+  const [prompt, setPrompt] = useState("");
+  const { completion, complete, isLoading, stop, error } = useCompletion({
+    api: "/api/generate",
+    streamProtocol: "text",
+    onError(err) {
+      setSubmitError(err.message || FALLBACK_ERROR);
+    },
+  });
 
+  const busy = isLoading || inFlight;
   const parsed = useMemo(() => parseCode(completion), [completion]);
   const visibleError = error?.message || submitError;
   const [previewCode, setPreviewCode] = useState<string | null>(null);
@@ -48,19 +49,20 @@ export function GeneratorShell() {
     }
     if (wasLoading.current) {
       wasLoading.current = false;
+      setInFlight(false);
       setPreviewCode(parsed.trim() ? parsed : null);
     }
   }, [isLoading, parsed]);
 
   function handleSubmit() {
-    const prompt = input.trim();
-    if (!prompt || isLoading || inFlightRef.current) return;
+    const nextPrompt = prompt.trim();
+    if (!nextPrompt || busy) return;
     stoppedRef.current = false;
-    inFlightRef.current = true;
+    setInFlight(true);
     setSubmitError(null);
     void (async () => {
       try {
-        const result = await complete(prompt);
+        const result = await complete(nextPrompt);
         if (!stoppedRef.current && !(result ?? "").trim()) {
           setSubmitError((current) => current ?? FALLBACK_ERROR);
         }
@@ -69,7 +71,7 @@ export function GeneratorShell() {
           err instanceof Error ? err.message : FALLBACK_ERROR,
         );
       } finally {
-        inFlightRef.current = false;
+        setInFlight(false);
       }
     })();
   }
@@ -77,20 +79,21 @@ export function GeneratorShell() {
   function handleStop() {
     stoppedRef.current = true;
     stop();
+    setInFlight(false);
   }
 
   return (
-    <div className="grid min-h-0 flex-1 gap-4 md:grid-cols-2">
-      <div className="order-3 md:order-1">
+    <div className="grid min-h-0 min-w-0 flex-1 gap-4 md:grid-cols-2">
+      <div className="order-3 min-w-0 md:order-1">
         <PromptForm
-          value={input}
-          onChange={(value) => setInput(value)}
+          value={prompt}
+          onChange={setPrompt}
           onSubmit={handleSubmit}
           onStop={handleStop}
-          isLoading={isLoading}
+          isLoading={busy}
         />
       </div>
-      <div className="order-1 md:order-2 flex min-h-64 flex-col gap-3">
+      <div className="order-1 flex min-h-64 min-w-0 flex-col gap-3 md:order-2">
         {visibleError ? (
           <p
             role="alert"

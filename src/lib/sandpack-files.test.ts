@@ -31,10 +31,19 @@ describe("buildSandpackFiles", () => {
     expect(APP_WRAPPER).toContain("export default function App()");
   });
 
-  it("does not override the react-ts template entry files", () => {
+  it("does not use the legacy /src/App.tsx path", () => {
     const files = buildSandpackFiles(SAMPLE);
     expect(files).not.toHaveProperty("/src/App.tsx");
-    expect(files).not.toHaveProperty("/index.tsx");
+  });
+
+  it("overrides /index.tsx with named React 19 imports", () => {
+    const files = buildSandpackFiles(SAMPLE);
+    expect(files["/index.tsx"].code).toContain(
+      'import { StrictMode } from "react"',
+    );
+    expect(files["/index.tsx"].code).not.toContain(
+      'import React, { StrictMode } from "react"',
+    );
   });
 });
 

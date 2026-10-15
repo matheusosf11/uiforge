@@ -7,7 +7,7 @@ export function CodeView({ code }: { code: string }) {
   return (
     <section
       aria-label="Generated code"
-      className="flex h-full min-h-64 flex-col rounded-xl border border-border bg-card p-4"
+      className="flex h-full min-h-64 min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card p-4"
     >
       <h2 className="mb-2 text-sm font-medium text-muted-foreground">
         Código gerado
