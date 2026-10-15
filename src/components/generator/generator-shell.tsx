@@ -6,6 +6,7 @@ import { useCompletion } from "@ai-sdk/react";
 import { CodeView } from "@/components/generator/code-view";
 import { PromptForm } from "@/components/generator/prompt-form";
 import { parseCode } from "@/lib/parse-code";
+import { cn } from "@/lib/utils";
 
 const SandboxPreview = dynamic(
   () =>
@@ -20,10 +21,17 @@ const SandboxPreview = dynamic(
   },
 );
 
+type Tab = "preview" | "code";
+
 const FALLBACK_ERROR = "Falha ao gerar o componente. Tente novamente.";
 
 export function GeneratorShell() {
   const stoppedRef = useRef(false);
+  const [tab, setTab] = useState<Tab>("preview");
+  const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({
+    preview: null,
+    code: null,
+  });
   const [inFlight, setInFlight] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -82,9 +90,25 @@ export function GeneratorShell() {
     setInFlight(false);
   }
 
+  function handleTabKeyDown(event: React.KeyboardEvent<HTMLButtonElement>) {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    const next: Tab = tab === "preview" ? "code" : "preview";
+    setTab(next);
+    tabRefs.current[next]?.focus();
+  }
+
+  const tabClass = (selected: boolean) =>
+    cn(
+      "h-11 rounded-md text-sm font-medium focus-visible:ring-3 focus-visible:ring-ring/50",
+      selected
+        ? "bg-background text-foreground shadow-sm"
+        : "text-muted-foreground",
+    );
+
   return (
     <div className="grid min-h-0 min-w-0 flex-1 gap-4 md:grid-cols-2">
-      <div className="order-3 min-w-0 md:order-1">
+      <div className="order-2 min-w-0 md:order-1">
         <PromptForm
           value={prompt}
           onChange={setPrompt}
@@ -102,32 +126,82 @@ export function GeneratorShell() {
             {visibleError}
           </p>
         ) : null}
-        {isLoading ? (
-          <section
-            aria-label="Live preview"
-            className="flex min-h-64 flex-col rounded-xl border border-dashed border-border bg-muted/30 p-4"
+        <div
+          role="tablist"
+          aria-label="Resultado"
+          className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1 md:hidden"
+        >
+          <button
+            type="button"
+            role="tab"
+            id="tab-preview"
+            ref={(el) => {
+              tabRefs.current.preview = el;
+            }}
+            aria-controls="panel-preview"
+            aria-selected={tab === "preview"}
+            tabIndex={tab === "preview" ? 0 : -1}
+            className={tabClass(tab === "preview")}
+            onClick={() => setTab("preview")}
+            onKeyDown={handleTabKeyDown}
           >
-            <h2 className="mb-2 text-sm font-medium text-muted-foreground">
-              Preview
-            </h2>
-            <p className="text-sm text-muted-foreground">Gerando preview…</p>
-          </section>
-        ) : previewCode ? (
-          <SandboxPreview code={previewCode} />
-        ) : (
-          <section
-            aria-label="Live preview"
-            className="flex min-h-64 flex-col rounded-xl border border-dashed border-border bg-muted/30 p-4"
+            Preview
+          </button>
+          <button
+            type="button"
+            role="tab"
+            id="tab-code"
+            ref={(el) => {
+              tabRefs.current.code = el;
+            }}
+            aria-controls="panel-code"
+            aria-selected={tab === "code"}
+            tabIndex={tab === "code" ? 0 : -1}
+            className={tabClass(tab === "code")}
+            onClick={() => setTab("code")}
+            onKeyDown={handleTabKeyDown}
           >
-            <h2 className="mb-2 text-sm font-medium text-muted-foreground">
-              Preview
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              O preview aparece aqui depois de gerar.
-            </p>
-          </section>
-        )}
-        <div className="min-h-0 flex-1">
+            Código
+          </button>
+        </div>
+        <div
+          role="tabpanel"
+          id="panel-preview"
+          aria-labelledby="tab-preview"
+          className={cn("min-w-0", tab !== "preview" && "max-md:hidden")}
+        >
+          {isLoading ? (
+            <section
+              aria-label="Live preview"
+              className="flex min-h-64 flex-col rounded-xl border border-dashed border-border bg-muted/30 p-4"
+            >
+              <h2 className="mb-2 text-sm font-medium text-muted-foreground">
+                Preview
+              </h2>
+              <p className="text-sm text-muted-foreground">Gerando preview…</p>
+            </section>
+          ) : previewCode ? (
+            <SandboxPreview code={previewCode} />
+          ) : (
+            <section
+              aria-label="Live preview"
+              className="flex min-h-64 flex-col rounded-xl border border-dashed border-border bg-muted/30 p-4"
+            >
+              <h2 className="mb-2 text-sm font-medium text-muted-foreground">
+                Preview
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                O preview aparece aqui depois de gerar.
+              </p>
+            </section>
+          )}
+        </div>
+        <div
+          role="tabpanel"
+          id="panel-code"
+          aria-labelledby="tab-code"
+          className={cn("min-h-0 min-w-0 flex-1", tab !== "code" && "max-md:hidden")}
+        >
           <CodeView code={parsed} busy={busy} />
         </div>
       </div>
