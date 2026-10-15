@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+/// <reference types="vitest/globals" />
 import { parseCode } from "./parse-code";
 
 const SAMPLE = `export default function Button() {
