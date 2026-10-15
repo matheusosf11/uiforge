@@ -61,18 +61,27 @@ export async function POST(req: Request) {
       controller.enqueue(encoder.encode(first));
     },
     async pull(controller) {
+      // Per the WHATWG Streams spec, pull() is not called again if it resolves
+      // without enqueue/close. Keep reading until a text delta is enqueued or
+      // the stream ends; skip non-text parts (text-start/text-end/start-step/
+      // finish-step/finish/reasoning/...), otherwise the response never closes.
       try {
-        const { done, value } = await reader.read();
-        if (done) {
-          controller.close();
-          return;
-        }
-        if (value.type === "text-delta") {
-          controller.enqueue(encoder.encode(value.text));
-        } else if (value.type === "error" || value.type === "abort") {
-          // Status is already sent; close gracefully (accepted limitation).
-          controller.close();
-          void reader.cancel().catch(() => {});
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            controller.close();
+            return;
+          }
+          if (value.type === "text-delta") {
+            controller.enqueue(encoder.encode(value.text));
+            return;
+          }
+          if (value.type === "error" || value.type === "abort") {
+            // Status is already sent; close gracefully (accepted limitation).
+            controller.close();
+            void reader.cancel().catch(() => {});
+            return;
+          }
         }
       } catch {
         controller.close();

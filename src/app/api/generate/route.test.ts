@@ -73,17 +73,37 @@ describe("POST /api/generate", () => {
     expect(await res.text()).toBe("generate_failed");
   });
 
-  it("sucesso faz streaming text/plain", async () => {
+  it("sucesso faz streaming text/plain com a sequencia real do fullStream", async () => {
+    // Sequencia emitida pelo streamText do AI SDK v7: partes "neutras"
+    // (text-end, finish-step, finish) chegam depois do ultimo delta.
     state.parts = [
       { type: "start" },
+      { type: "start-step" },
+      { type: "text-start" },
       { type: "text-delta", text: "ab" },
       { type: "text-delta", text: "cd" },
+      { type: "text-end" },
+      { type: "finish-step" },
+      { type: "finish" },
     ];
     const res = await POST(req({ prompt: "x" }));
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("text/plain; charset=utf-8");
     expect(await res.text()).toBe("abcd");
-  });
+  }, 1000);
+
+  it("partes neutras entre deltas nao travam o stream", async () => {
+    state.parts = [
+      { type: "text-delta", text: "a" },
+      { type: "text-end" },
+      { type: "text-start" },
+      { type: "text-delta", text: "b" },
+      { type: "finish-step" },
+      { type: "finish" },
+    ];
+    const res = await POST(req({ prompt: "x" }));
+    expect(await res.text()).toBe("ab");
+  }, 1000);
 
   it("read() rejeitando com 429 antes do primeiro delta", async () => {
     state.readError = api429();
