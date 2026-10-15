@@ -1,0 +1,114 @@
+// @vitest-environment node
+/// <reference types="vitest/globals" />
+import { APICallError } from "ai";
+
+type Part = Record<string, unknown>;
+
+const state: { parts: Part[]; readError?: unknown } = { parts: [] };
+
+vi.mock("ai", async () => {
+  const actual = await vi.importActual<typeof import("ai")>("ai");
+  return {
+    ...actual,
+    streamText: vi.fn(() => ({
+      fullStream: new ReadableStream<Part>({
+        pull(controller) {
+          if (state.readError) {
+            controller.error(state.readError);
+            return;
+          }
+          const next = state.parts.shift();
+          if (next) controller.enqueue(next);
+          else controller.close();
+        },
+      }),
+    })),
+  };
+});
+vi.mock("@/lib/ai/model", () => ({ model: {} }));
+vi.mock("@/lib/ai/prompt", () => ({ SYSTEM_PROMPT: "sys" }));
+
+import { POST } from "./route";
+
+const api429 = () =>
+  new APICallError({
+    message: "quota",
+    url: "u",
+    requestBodyValues: {},
+    statusCode: 429,
+  });
+
+function req(body: unknown) {
+  return new Request("http://localhost/api/generate", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+beforeEach(() => {
+  process.env.GOOGLE_GENERATIVE_AI_API_KEY = "k";
+  state.parts = [];
+  state.readError = undefined;
+});
+
+describe("POST /api/generate", () => {
+  it("429 do provider antes do primeiro token", async () => {
+    state.parts = [{ type: "start" }, { type: "error", error: api429() }];
+    const res = await POST(req({ prompt: "x" }));
+    expect(res.status).toBe(429);
+    expect(await res.text()).toBe("rate_limited");
+  });
+
+  it("outro erro vira 502", async () => {
+    state.parts = [{ type: "error", error: new Error("boom") }];
+    const res = await POST(req({ prompt: "x" }));
+    expect(res.status).toBe(502);
+    expect(await res.text()).toBe("generate_failed");
+  });
+
+  it("stream vazio vira 502", async () => {
+    state.parts = [{ type: "start" }, { type: "finish" }];
+    const res = await POST(req({ prompt: "x" }));
+    expect(res.status).toBe(502);
+    expect(await res.text()).toBe("generate_failed");
+  });
+
+  it("sucesso faz streaming text/plain", async () => {
+    state.parts = [
+      { type: "start" },
+      { type: "text-delta", text: "ab" },
+      { type: "text-delta", text: "cd" },
+    ];
+    const res = await POST(req({ prompt: "x" }));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("text/plain; charset=utf-8");
+    expect(await res.text()).toBe("abcd");
+  });
+
+  it("read() rejeitando com 429 antes do primeiro delta", async () => {
+    state.readError = api429();
+    const res = await POST(req({ prompt: "x" }));
+    expect(res.status).toBe(429);
+  });
+
+  it("erro depois do primeiro delta fecha sem lancar", async () => {
+    state.parts = [
+      { type: "text-delta", text: "ab" },
+      { type: "error", error: new Error("late") },
+    ];
+    const res = await POST(req({ prompt: "x" }));
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe("ab");
+  });
+
+  it("prompt invalido continua 400", async () => {
+    const res = await POST(req({ prompt: "" }));
+    expect(res.status).toBe(400);
+  });
+
+  it("sem API key continua 500", async () => {
+    delete process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    const res = await POST(req({ prompt: "x" }));
+    expect(res.status).toBe(500);
+  });
+});

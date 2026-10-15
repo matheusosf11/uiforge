@@ -2,6 +2,7 @@ import { streamText } from "ai";
 import { z } from "zod";
 import { model } from "@/lib/ai/model";
 import { SYSTEM_PROMPT } from "@/lib/ai/prompt";
+import { isRateLimitError } from "@/lib/generate-error";
 
 export const runtime = "nodejs";
 export const maxDuration = 60; // Vercel Hobby allows up to 300; prevents stream truncation (P5)
@@ -26,6 +27,69 @@ export async function POST(req: Request) {
   }
 
   const result = streamText({ model, system: SYSTEM_PROMPT, prompt: parsed.prompt });
+
+  // Peek the full stream until the first text delta so a provider failure
+  // (e.g. 429) can be reported as a real HTTP status before any byte is sent.
+  const reader = result.fullStream.getReader();
+  const encoder = new TextEncoder();
+  let firstDelta: string | null = null;
+
+  try {
+    while (firstDelta === null) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value.type === "text-delta") {
+        firstDelta = value.text;
+      } else if (value.type === "error") {
+        return failureResponse(value.error);
+      } else if (value.type === "abort") {
+        break;
+      }
+    }
+  } catch (error) {
+    return failureResponse(error);
+  }
+
+  if (firstDelta === null) {
+    return new Response("generate_failed", { status: 502 });
+  }
+
+  const first = firstDelta;
   // Plain text stream protocol (not the UI-message protocol).
-  return result.toTextStreamResponse();
+  const readable = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(encoder.encode(first));
+    },
+    async pull(controller) {
+      try {
+        const { done, value } = await reader.read();
+        if (done) {
+          controller.close();
+          return;
+        }
+        if (value.type === "text-delta") {
+          controller.enqueue(encoder.encode(value.text));
+        } else if (value.type === "error" || value.type === "abort") {
+          // Status is already sent; close gracefully (accepted limitation).
+          controller.close();
+          void reader.cancel().catch(() => {});
+        }
+      } catch {
+        controller.close();
+      }
+    },
+    cancel() {
+      void reader.cancel().catch(() => {});
+    },
+  });
+
+  return new Response(readable, {
+    headers: { "content-type": "text/plain; charset=utf-8" },
+  });
+}
+
+function failureResponse(error: unknown) {
+  return isRateLimitError(error)
+    ? new Response("rate_limited", { status: 429 })
+    : new Response("generate_failed", { status: 502 });
 }
