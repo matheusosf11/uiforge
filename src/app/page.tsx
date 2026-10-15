@@ -1,3 +1,5 @@
+import { GeneratorShell } from "@/components/generator/generator-shell";
+
 export default function Home() {
   return (
     <main className="min-h-screen bg-background p-6 text-foreground md:p-8">
@@ -10,29 +12,7 @@ export default function Home() {
           </p>
         </header>
 
-        <div className="grid min-h-0 flex-1 gap-4 md:grid-cols-2">
-          <section
-            aria-label="Prompt"
-            className="flex min-h-64 flex-col rounded-xl border border-border bg-card p-4"
-          >
-            <h2 className="mb-2 text-sm font-medium text-muted-foreground">
-              Prompt
-            </h2>
-            <div className="flex-1 rounded-lg border border-dashed border-border bg-muted/30" />
-          </section>
-
-          <section
-            aria-label="Generated code"
-            className="flex min-h-64 flex-col rounded-xl border border-border bg-card p-4"
-          >
-            <h2 className="mb-2 text-sm font-medium text-muted-foreground">
-              Código gerado
-            </h2>
-            <pre className="flex-1 overflow-auto rounded-lg border border-dashed border-border bg-muted/30 p-3 font-mono text-xs text-muted-foreground">
-              {`// O código gerado aparece aqui`}
-            </pre>
-          </section>
-        </div>
+        <GeneratorShell />
       </div>
     </main>
   );
