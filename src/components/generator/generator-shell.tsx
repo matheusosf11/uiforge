@@ -33,6 +33,9 @@ export function GeneratorShell() {
   const stoppedRef = useRef(false);
   const failedRef = useRef(false);
   const lastPromptRef = useRef("");
+  // Identifies the current request so a stale IIFE (e.g. after "Parar" and a
+  // quick resend) never touches refs/state of the newer generation.
+  const requestIdRef = useRef(0);
   const [tab, setTab] = useState<Tab>("preview");
   const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({
     preview: null,
@@ -81,10 +84,12 @@ export function GeneratorShell() {
     setFriendly(null);
     setFinished(false);
     setInFlight(true);
+    const id = ++requestIdRef.current;
+    const isCurrent = () => id === requestIdRef.current;
     void (async () => {
       try {
         const result = await complete(text);
-        if (stoppedRef.current) return;
+        if (!isCurrent() || stoppedRef.current) return;
         if (!(result ?? "").trim()) {
           failedRef.current = true;
           setFriendly((current) => current ?? GENERIC_ERROR_MESSAGE);
@@ -92,13 +97,17 @@ export function GeneratorShell() {
           setFinished(true);
         }
       } catch (err) {
-        if (stoppedRef.current || (err instanceof Error && err.name === "AbortError")) {
+        if (
+          !isCurrent() ||
+          stoppedRef.current ||
+          (err instanceof Error && err.name === "AbortError")
+        ) {
           return;
         }
         failedRef.current = true;
         setFriendly(friendlyGenerateError(err));
       } finally {
-        setInFlight(false);
+        if (isCurrent()) setInFlight(false);
       }
     })();
   }
@@ -113,6 +122,7 @@ export function GeneratorShell() {
 
   function handleStop() {
     stoppedRef.current = true;
+    requestIdRef.current += 1;
     stop();
     setFriendly(null);
     setFinished(false);
