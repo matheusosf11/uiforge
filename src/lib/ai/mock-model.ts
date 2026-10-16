@@ -1,6 +1,13 @@
 import { simulateReadableStream } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
-import type { LanguageModelV4StreamPart } from "@ai-sdk/provider";
+
+// Derived from declared packages only (avoids importing undeclared @ai-sdk/provider).
+type LanguageModelV4StreamPart =
+  Awaited<ReturnType<MockLanguageModelV4["doStream"]>>["stream"] extends ReadableStream<
+    infer P
+  >
+    ? P
+    : never;
 
 // Deterministic, hooks-free component streamed by the e2e mock model (D-01).
 export const FIXED_COMPONENT = `import React from "react";
