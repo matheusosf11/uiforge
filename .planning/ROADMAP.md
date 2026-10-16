@@ -143,7 +143,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 04-07-PLAN.md — Secrets scan, rename to main, public GitHub repo + push, green CI (checkpoints)
+- [x] 04-07-PLAN.md — Secrets scan, rename to main, public GitHub repo + push, green CI (checkpoints)
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
@@ -159,4 +159,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Foundation & Streaming Generation | 4/4 | Complete    | 2026-10-15 |
 | 2. Sandboxed Live Preview | 2/2 | Complete   | 2026-10-15 |
 | 3. Export, Examples & Accessible UX | 3/3 | Complete   | 2026-10-15 |
-| 4. Quality Gate & Deploy | 6/8 | In Progress|  |
+| 4. Quality Gate & Deploy | 7/8 | In Progress|  |
