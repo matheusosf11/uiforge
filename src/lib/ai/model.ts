@@ -1,7 +1,7 @@
 import { google } from "@ai-sdk/google";
 
 // Single source of truth for the model id — swap here for a higher-headroom model or the Groq fallback.
-export const MODEL_ID = "gemini-2.5-flash";
+export const MODEL_ID = "gemini-3.8-flash";
 
 // D-02: the mock switch is an env var only (never a header/body/NEXT_PUBLIC_
 // value) and is hard-disabled on Vercel Production. Read at call time.

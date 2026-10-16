@@ -72,7 +72,7 @@ Walk-through:
 
 - `src/components/generator/generator-shell.tsx` owns the client state (idle, streaming, finished, error) and reads the response body as a plain text stream.
 - `src/app/api/generate/route.ts` (Node runtime, `maxDuration = 60`) validates the body with zod, applies the rate limit, then calls `streamText`. It peeks until the first text delta so provider failures (for example 429) become real HTTP statuses before any byte is sent; later failures error the stream so the client shows the alert and retry instead of a truncated "Pronto".
-- `src/lib/ai/model.ts` is the single place that picks the model (`gemini-2.5-flash`). When `UIFORGE_E2E_MOCK=1` (and not on Vercel Production) it dynamically imports `mock-model.ts`, a deterministic fixture used by e2e.
+- `src/lib/ai/model.ts` is the single place that picks the model (`gemini-3.8-flash`). When `UIFORGE_E2E_MOCK=1` (and not on Vercel Production) it dynamically imports `mock-model.ts`, a deterministic fixture used by e2e.
 - `src/lib/parse-code.ts` extracts the component code from the stream.
 - `src/lib/preview-srcdoc.ts` rewrites the React imports and default export, then builds a full HTML document that loads pinned CDN builds of Tailwind (browser build), React 18.3.1 and Babel standalone, transpiles the code in the iframe and mounts it.
 - `src/components/generator/sandbox-preview.tsx` renders that document as `<iframe sandbox="allow-scripts" srcDoc=...>` with `color-scheme: light`, and listens for error messages posted by the iframe.

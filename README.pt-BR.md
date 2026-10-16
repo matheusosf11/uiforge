@@ -72,7 +72,7 @@ Visão geral:
 
 - `src/components/generator/generator-shell.tsx` guarda o estado do cliente (ocioso, streaming, finalizado, erro) e lê o corpo da resposta como stream de texto puro.
 - `src/app/api/generate/route.ts` (runtime Node, `maxDuration = 60`) valida o corpo com zod, aplica o rate limit e chama `streamText`. Ele espia até o primeiro text delta para que falhas do provedor (por exemplo 429) virem status HTTP reais antes de qualquer byte ser enviado; falhas posteriores fazem o stream dar erro, e o cliente mostra o alerta com nova tentativa em vez de um "Pronto" truncado.
-- `src/lib/ai/model.ts` é o único ponto que escolhe o modelo (`gemini-2.5-flash`). Com `UIFORGE_E2E_MOCK=1` (e fora da Vercel Production) ele importa dinamicamente `mock-model.ts`, uma fixture determinística usada no e2e.
+- `src/lib/ai/model.ts` é o único ponto que escolhe o modelo (`gemini-3.8-flash`). Com `UIFORGE_E2E_MOCK=1` (e fora da Vercel Production) ele importa dinamicamente `mock-model.ts`, uma fixture determinística usada no e2e.
 - `src/lib/parse-code.ts` extrai o código do componente do stream.
 - `src/lib/preview-srcdoc.ts` reescreve os imports do React e o export default, e monta um documento HTML completo que carrega builds de CDN com versões fixas de Tailwind (build para navegador), React 18.3.1 e Babel standalone, transpila o código dentro do iframe e o monta.
 - `src/components/generator/sandbox-preview.tsx` renderiza esse documento como `<iframe sandbox="allow-scripts" srcDoc=...>` com `color-scheme: light` e escuta as mensagens de erro enviadas pelo iframe.
