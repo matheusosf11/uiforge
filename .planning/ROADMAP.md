@@ -120,13 +120,34 @@ Plans:
   4. The app deploys publicly on Vercel with a working shareable link
   5. The README documents setup (Gemini API key), architecture, and key trade-offs (incl. the sandbox threat model)
 
-**Plans**: TBD
+**Plans**: 8 plans
 
 Plans:
+**Wave 1**
 
-- [ ] 04-01: Vitest unit coverage (esp. parse-code) + Playwright e2e (prompt → code → preview mounts)
-- [ ] 04-02: GitHub Actions CI (Node 22, lint/test/build) + public Vercel deploy with env var
-- [ ] 04-03: README (setup, architecture, sandbox threat model, trade-offs, what was cut)
+- [ ] 04-01-PLAN.md — Rate limit + env-gated mock model wired into generate route (unit-tested)
+- [ ] 04-02-PLAN.md — Playwright/coverage deps (legitimacy gate), Vitest coverage config, Node 22 pin, scripts
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 04-03-PLAN.md — Always-light preview (D-17), sandbox invariant test, Sandpack cleanup
+- [ ] 04-05-PLAN.md — GitHub Actions CI, MIT LICENSE, Open Graph metadata, rate-limit doc nuance
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 04-04-PLAN.md — Playwright config + 4 e2e scenarios on production build with mock model
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 04-06-PLAN.md — Screenshots automation + bilingual README (threat model, trade-offs)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 04-07-PLAN.md — Secrets scan, rename to main, public GitHub repo + push, green CI (checkpoints)
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [ ] 04-08-PLAN.md — Vercel import, GitHub About, real URLs/badge, live smoke test (checkpoints)
 
 ## Progress
 
