@@ -52,6 +52,16 @@ describe("checkRateLimit", () => {
     expect(checkRateLimit("k0", cfg, 120_002).ok).toBe(false);
   });
 
+  it("caps tracked keys: extra live keys share one overflow bucket", () => {
+    for (let i = 0; i < 5000; i++) checkRateLimit(`k${i}`, cfg, 0);
+    // Map is full of live windows: spoofed new keys collapse into one bucket.
+    let blocked = 0;
+    for (let i = 0; i < 20; i++) {
+      if (!checkRateLimit(`spoof${i}`, cfg, 1).ok) blocked++;
+    }
+    expect(blocked).toBe(15);
+  });
+
   it("__resetRateLimit clears state", () => {
     for (let i = 0; i < 5; i++) checkRateLimit("a", cfg, 0);
     __resetRateLimit();
@@ -63,16 +73,47 @@ describe("clientIp", () => {
   const mk = (headers: Record<string, string>) =>
     new Request("http://localhost/x", { headers });
 
-  it("uses the first x-forwarded-for entry, trimmed", () => {
-    expect(clientIp(mk({ "x-forwarded-for": " 1.1.1.1 , 2.2.2.2" }))).toBe("1.1.1.1");
+  describe("on Vercel", () => {
+    beforeEach(() => vi.stubEnv("VERCEL", "1"));
+
+    it("prefers x-vercel-forwarded-for", () => {
+      expect(
+        clientIp(
+          mk({
+            "x-vercel-forwarded-for": "9.9.9.9",
+            "x-real-ip": "3.3.3.3",
+            "x-forwarded-for": "1.1.1.1",
+          }),
+        ),
+      ).toBe("9.9.9.9");
+    });
+
+    it("then x-real-ip", () => {
+      expect(
+        clientIp(mk({ "x-real-ip": "3.3.3.3", "x-forwarded-for": "1.1.1.1" })),
+      ).toBe("3.3.3.3");
+    });
+
+    it("then the first x-forwarded-for entry, trimmed", () => {
+      expect(clientIp(mk({ "x-forwarded-for": " 1.1.1.1 , 2.2.2.2" }))).toBe("1.1.1.1");
+    });
+
+    it("falls back to unknown", () => {
+      expect(clientIp(mk({}))).toBe("unknown");
+    });
   });
 
-  it("falls back to x-real-ip", () => {
-    expect(clientIp(mk({ "x-real-ip": "3.3.3.3" }))).toBe("3.3.3.3");
-  });
-
-  it("falls back to unknown", () => {
-    expect(clientIp(mk({}))).toBe("unknown");
+  it("ignores spoofable forwarded headers when not on Vercel", () => {
+    vi.stubEnv("VERCEL", "");
+    expect(
+      clientIp(
+        mk({
+          "x-forwarded-for": "1.1.1.1",
+          "x-real-ip": "3.3.3.3",
+          "x-vercel-forwarded-for": "9.9.9.9",
+        }),
+      ),
+    ).toBe("unknown");
   });
 });
 

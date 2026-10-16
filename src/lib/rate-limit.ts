@@ -9,7 +9,9 @@ export type RateLimitResult = { ok: true } | { ok: false; retryAfterSec: number 
 
 const DEFAULT_MAX = 5;
 const DEFAULT_WINDOW_MS = 60_000;
-const CLEANUP_THRESHOLD = 5000;
+// Hard cap on tracked keys: bounds memory and the O(n) sweep (WR-02).
+const MAX_KEYS = 5000;
+const OVERFLOW_KEY = "__overflow__";
 
 const hits = new Map<string, number[]>();
 
@@ -18,10 +20,12 @@ export function checkRateLimit(
   config: RateLimitConfig,
   now = Date.now(),
 ): RateLimitResult {
-  if (hits.size > CLEANUP_THRESHOLD) {
+  if (hits.size >= MAX_KEYS) {
     for (const [k, list] of hits) {
       if (list.every((t) => t <= now - config.windowMs)) hits.delete(k);
     }
+    // Still full of live windows: new keys share one bucket instead of growing the map.
+    if (!hits.has(key) && hits.size >= MAX_KEYS) key = OVERFLOW_KEY;
   }
 
   const recent = (hits.get(key) ?? []).filter((t) => t > now - config.windowMs);
@@ -38,14 +42,17 @@ export function checkRateLimit(
   return { ok: true };
 }
 
+// Forwarded headers are client-controlled unless a trusted proxy overwrites
+// them, so they are only honoured on Vercel. Elsewhere every request shares the
+// "unknown" bucket (conservative; see README trade-offs).
 export function clientIp(req: Request): string {
-  const forwarded = req.headers.get("x-forwarded-for");
-  if (forwarded) {
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) return first;
-  }
+  if (!process.env.VERCEL) return "unknown";
+  const vercel = req.headers.get("x-vercel-forwarded-for")?.split(",")[0]?.trim();
+  if (vercel) return vercel;
   const real = req.headers.get("x-real-ip")?.trim();
-  return real || "unknown";
+  if (real) return real;
+  const first = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  return first || "unknown";
 }
 
 function positiveInt(raw: string | undefined, fallback: number): number {

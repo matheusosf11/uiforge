@@ -101,6 +101,7 @@ O que NÃO protege (riscos residuais):
 - Free tier do Gemini: sem custo, porém com cota e latência limitadas; o id do modelo fica em uma única constante para facilitar a troca.
 - iframe srcdoc em vez de Sandpack: o Sandpack foi usado primeiro e removido. Um srcdoc feito à mão mantém explícitos o atributo sandbox e o modelo de origem e elimina uma dependência pesada, ao custo de depender de scripts de CDN em runtime.
 - Rate limit em memória e best-effort: os contadores vivem em uma instância serverless, não são compartilhados entre instâncias e zeram em cold starts. Um limitador distribuído (PLAT-01, por exemplo Upstash) é a correção real e fica para a v2.
+- Ressalva para self-hosting: a chave por IP só confia em headers encaminhados (`x-vercel-forwarded-for`, `x-real-ip`, `x-forwarded-for`) quando `VERCEL` está definido; fora da Vercel todos os clientes compartilham um bucket, então use um proxy confiável ou um limitador real à frente.
 - Modelo mock no e2e: os testes são determinísticos, gratuitos e sem chave, mas não exercitam o provedor real. A chave de ativação é só uma variável de ambiente e é ignorada na Vercel Production.
 - Preview sempre claro: componentes gerados costumam assumir fundo branco, então o iframe é forçado ao tema claro independentemente do tema do host.
 - Dependência de CDN no preview: uso offline ou queda da CDN quebra o preview (o painel de código continua funcionando).
