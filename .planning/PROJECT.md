@@ -21,7 +21,7 @@ A user types a prompt and gets working, previewable React + Tailwind component c
 
 ### Active
 
-- [ ] Generated component renders live in a secure sandboxed preview (Sandpack iframe)
+- [ ] Generated component renders live in a secure sandboxed preview (sandboxed srcdoc iframe)
 - [ ] Project is covered by unit tests (Vitest) and an e2e test (Playwright), runs in CI (GitHub Actions), and deploys publicly on Vercel
 
 ### Out of Scope
@@ -29,7 +29,7 @@ A user types a prompt and gets working, previewable React + Tailwind component c
 - User authentication / accounts — portfolio demo, keeps v1 simple and frictionless
 - Persistent history of generations — not needed for the core demo loop
 - Iterative refinement ("change the color") — deferred to a later version
-- Rate limiting (e.g. Upstash) — not required for a personal portfolio demo
+- Distributed rate limiting (e.g. Upstash, PLAT-01) — out of scope / v2. A best-effort in-memory per-IP limit (5 generations/minute, per serverless instance) ships in Phase 4 as a partial, deliberate pull-forward
 - Multi-file / full-project generation — v1 focuses on a single component
 
 ## Context
@@ -37,7 +37,7 @@ A user types a prompt and gets working, previewable React + Tailwind component c
 - Target user: the project owner, a front-end developer building a portfolio to attract recruiters at large companies.
 - Primary stack chosen: React + Next.js 15 (App Router) with TypeScript.
 - AI must use a free tier: Google Gemini via Vercel AI SDK (Groq is a documented fallback).
-- Live preview must run untrusted/generated code safely — Sandpack renders inside an isolated iframe, never on the main page.
+- Live preview must run untrusted/generated code safely — the preview renders inside an isolated sandboxed srcdoc iframe, never on the main page.
 - The project doubles as a conversation piece in interviews (streaming UX, sandboxed execution, modern RSC/App Router architecture).
 - Requires a free Google AI Studio API key in `.env.local` as `GOOGLE_GENERATIVE_AI_API_KEY`.
 - An approved implementation plan exists at `.cursor/plans/uiforge_portfolio_project_d031284c.plan.md`.
@@ -46,7 +46,7 @@ A user types a prompt and gets working, previewable React + Tailwind component c
 
 - **Tech stack**: Next.js 15 App Router + TypeScript + Tailwind CSS + shadcn/ui — modern stack recruiters recognize.
 - **AI/Budget**: Must use a free LLM tier (Google Gemini) — no paid API required to run the demo.
-- **Security**: Generated code executes only inside the Sandpack sandbox iframe, never in the host app context.
+- **Security**: Generated code executes only inside the sandboxed srcdoc iframe, never in the host app context.
 - **Deployment**: Must deploy publicly on Vercel (free tier) with a shareable link for the portfolio.
 - **Auth**: No login in v1.
 

@@ -16,7 +16,7 @@
 
 ### Live Preview
 
-- [x] **PREV-01**: Generated component renders live inside a sandboxed Sandpack iframe (never in the host page)
+- [x] **PREV-01**: Generated component renders live inside a sandboxed srcdoc iframe (never in the host page)
 - [x] **PREV-02**: Tailwind styling applies correctly inside the preview
 - [x] **PREV-03**: Preview shows a clear error state when generated code fails to render
 
@@ -60,7 +60,7 @@
 | User authentication / accounts | Portfolio demo; keeps v1 frictionless |
 | Persistent generation history | Not core to the demo loop (deferred to v2) |
 | Iterative chat-style refinement | Adds state/complexity; deferred to v2 |
-| Rate limiting infrastructure | Not needed for a personal portfolio demo (v2) |
+| Distributed rate limiting infrastructure | A best-effort in-memory per-IP limit ships in Phase 4; distributed version is v2 / PLAT-01 |
 | Multi-file / full-project generation | v1 focuses on a single component |
 | Backend database / persistence | Stateless single-loop app by design |
 | Figma import | Out of scope for v1 |
