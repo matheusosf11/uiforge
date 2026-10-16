@@ -1,0 +1,92 @@
+/// <reference types="vitest/globals" />
+import { getModel, isE2EMock } from "./model";
+import { FIXED_COMPONENT, createE2EMockModel } from "./mock-model";
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
+describe("isE2EMock", () => {
+  it("is true only when UIFORGE_E2E_MOCK is 1 outside production", () => {
+    vi.stubEnv("UIFORGE_E2E_MOCK", "1");
+    expect(isE2EMock()).toBe(true);
+  });
+
+  it.each(["0", "true", ""])("is false for value %j", (v) => {
+    vi.stubEnv("UIFORGE_E2E_MOCK", v);
+    expect(isE2EMock()).toBe(false);
+  });
+
+  it("is false when unset", () => {
+    vi.stubEnv("UIFORGE_E2E_MOCK", undefined);
+    expect(isE2EMock()).toBe(false);
+  });
+
+  it("is false on VERCEL_ENV=production even with the flag set", () => {
+    vi.stubEnv("UIFORGE_E2E_MOCK", "1");
+    vi.stubEnv("VERCEL_ENV", "production");
+    expect(isE2EMock()).toBe(false);
+  });
+});
+
+describe("getModel", () => {
+  it("returns the mock model in mock mode", async () => {
+    vi.stubEnv("UIFORGE_E2E_MOCK", "1");
+    const m = await getModel("x");
+    expect(m).toHaveProperty("doStream");
+    expect((m as { provider: string }).provider).not.toContain("google");
+  });
+
+  it("returns the google model otherwise", async () => {
+    vi.stubEnv("UIFORGE_E2E_MOCK", undefined);
+    const m = await getModel("x");
+    expect((m as { provider: string }).provider).toContain("google");
+  });
+});
+
+async function consume(prompt: string) {
+  const model = createE2EMockModel(prompt);
+  const { stream } = await model.doStream({ prompt: [] } as never);
+  const parts: Array<{ type: string; delta?: string }> = [];
+  const reader = stream.getReader();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    parts.push(value as { type: string; delta?: string });
+  }
+  return parts;
+}
+
+describe("mock model stream", () => {
+  it("streams FIXED_COMPONENT then finishes", async () => {
+    const parts = await consume("hello");
+    const types = parts.map((p) => p.type);
+    expect(types[0]).toBe("text-start");
+    expect(types.at(-2)).toBe("text-end");
+    expect(types.at(-1)).toBe("finish");
+    const text = parts
+      .filter((p) => p.type === "text-delta")
+      .map((p) => p.delta)
+      .join("");
+    expect(text).toBe(FIXED_COMPONENT);
+    expect(parts.filter((p) => p.type === "text-delta").length).toBeGreaterThan(3);
+  });
+
+  it("fails mid-stream after >=2 deltas for __e2e_error__", async () => {
+    const parts = await consume("please __e2e_error__");
+    const types = parts.map((p) => p.type);
+    expect(types[0]).toBe("text-start");
+    expect(types.filter((t) => t === "text-delta").length).toBeGreaterThanOrEqual(2);
+    expect(types.at(-1)).toBe("error");
+    expect(types).not.toContain("text-end");
+    expect(types).not.toContain("finish");
+  });
+});
+
+describe("FIXED_COMPONENT", () => {
+  it("is a hooks-free default-exported FixtureCard", () => {
+    expect(FIXED_COMPONENT).toContain("export default function FixtureCard");
+    expect(FIXED_COMPONENT).not.toMatch(/use(State|Effect|Ref|Memo)/);
+    expect(FIXED_COMPONENT).toContain("className=");
+  });
+});
