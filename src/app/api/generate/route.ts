@@ -1,9 +1,10 @@
 import { streamText } from "ai";
 import { z } from "zod";
-import { model } from "@/lib/ai/model";
+import { getModel, isE2EMock } from "@/lib/ai/model";
 import { SYSTEM_PROMPT } from "@/lib/ai/prompt";
 import { isRateLimitError } from "@/lib/generate-error";
 import { MAX_PROMPT_LENGTH } from "@/lib/prompt-limits";
+import { checkRateLimit, clientIp, getRateLimitConfig } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const maxDuration = 60; // Vercel Hobby allows up to 300; prevents stream truncation (P5)
@@ -20,7 +21,14 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
-  if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+  const limit = checkRateLimit(clientIp(req), getRateLimitConfig());
+  if (!limit.ok) {
+    return new Response("rate_limited", {
+      status: 429,
+      headers: { "Retry-After": String(limit.retryAfterSec) },
+    });
+  }
+  if (!isE2EMock() && !process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
     return new Response(
       "Missing GOOGLE_GENERATIVE_AI_API_KEY. Add it to .env.local (see .env.example).",
       { status: 500 },
@@ -28,7 +36,7 @@ export async function POST(req: Request) {
   }
 
   const result = streamText({
-    model,
+    model: await getModel(parsed.prompt),
     system: SYSTEM_PROMPT,
     prompt: parsed.prompt,
     // Client disconnect/"Parar" cancels the provider request (and quota use).

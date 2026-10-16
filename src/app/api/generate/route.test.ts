@@ -25,9 +25,14 @@ vi.mock("ai", async () => {
     })),
   };
 });
-vi.mock("@/lib/ai/model", () => ({ model: {} }));
+const mockFlag = vi.hoisted(() => ({ on: false }));
+vi.mock("@/lib/ai/model", () => ({
+  getModel: async () => ({}),
+  isE2EMock: () => mockFlag.on,
+}));
 vi.mock("@/lib/ai/prompt", () => ({ SYSTEM_PROMPT: "sys" }));
 
+import { __resetRateLimit } from "@/lib/rate-limit";
 import { POST } from "./route";
 
 const api429 = () =>
@@ -38,10 +43,11 @@ const api429 = () =>
     statusCode: 429,
   });
 
-function req(body: unknown) {
+function req(body: unknown, headers?: Record<string, string>) {
   return new Request("http://localhost/api/generate", {
     method: "POST",
     body: JSON.stringify(body),
+    headers,
   });
 }
 
@@ -49,6 +55,8 @@ beforeEach(() => {
   process.env.GOOGLE_GENERATIVE_AI_API_KEY = "k";
   state.parts = [];
   state.readError = undefined;
+  mockFlag.on = false;
+  __resetRateLimit();
 });
 
 describe("POST /api/generate", () => {
@@ -131,5 +139,40 @@ describe("POST /api/generate", () => {
     delete process.env.GOOGLE_GENERATIVE_AI_API_KEY;
     const res = await POST(req({ prompt: "x" }));
     expect(res.status).toBe(500);
+  });
+
+  it("sexta requisicao do mesmo IP recebe 429 com Retry-After", async () => {
+    const h = { "x-forwarded-for": "1.2.3.4" };
+    for (let i = 0; i < 5; i++) {
+      state.parts = [{ type: "text-delta", text: "a" }];
+      const ok = await POST(req({ prompt: "x" }, h));
+      expect(ok.status).not.toBe(429);
+      await ok.text();
+    }
+    const res = await POST(req({ prompt: "x" }, h));
+    expect(res.status).toBe(429);
+    expect(await res.text()).toBe("rate_limited");
+    expect(res.headers.get("Retry-After")).toMatch(/^[1-9]\d*$/);
+
+    state.parts = [{ type: "text-delta", text: "a" }];
+    const other = await POST(req({ prompt: "x" }, { "x-forwarded-for": "5.6.7.8" }));
+    expect(other.status).not.toBe(429);
+  });
+
+  it("limite roda depois da validacao (400 nao consome)", async () => {
+    const h = { "x-forwarded-for": "9.9.9.9" };
+    for (let i = 0; i < 10; i++) {
+      const res = await POST(req({ prompt: "" }, h));
+      expect(res.status).toBe(400);
+    }
+  });
+
+  it("modo mock dispensa a API key", async () => {
+    mockFlag.on = true;
+    delete process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    state.parts = [{ type: "text-delta", text: "ok" }];
+    const res = await POST(req({ prompt: "x" }));
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe("ok");
   });
 });

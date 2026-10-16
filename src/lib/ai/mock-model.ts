@@ -1,5 +1,6 @@
 import { simulateReadableStream } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
+import type { LanguageModelV4StreamPart } from "@ai-sdk/provider";
 
 // Deterministic, hooks-free component streamed by the e2e mock model (D-01).
 export const FIXED_COMPONENT = `import React from "react";
@@ -39,7 +40,7 @@ export function createE2EMockModel(prompt: string) {
   }));
   const shouldFail = prompt.includes(ERROR_KEYWORD);
 
-  const chunks = shouldFail
+  const chunks: LanguageModelV4StreamPart[] = shouldFail
     ? [
         { type: "text-start" as const, id: ID },
         ...deltas.slice(0, 4),
