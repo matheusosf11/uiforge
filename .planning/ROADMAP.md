@@ -130,12 +130,12 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 04-03-PLAN.md — Always-light preview (D-17), sandbox invariant test, Sandpack cleanup
+- [x] 04-03-PLAN.md — Always-light preview (D-17), sandbox invariant test, Sandpack cleanup
 - [ ] 04-05-PLAN.md — GitHub Actions CI, MIT LICENSE, Open Graph metadata, rate-limit doc nuance
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 04-04-PLAN.md — Playwright config + 4 e2e scenarios on production build with mock model
+- [x] 04-04-PLAN.md — Playwright config + 4 e2e scenarios on production build with mock model
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -159,4 +159,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Foundation & Streaming Generation | 4/4 | Complete    | 2026-10-15 |
 | 2. Sandboxed Live Preview | 2/2 | Complete   | 2026-10-15 |
 | 3. Export, Examples & Accessible UX | 3/3 | Complete   | 2026-10-15 |
-| 4. Quality Gate & Deploy | 2/8 | In Progress|  |
+| 4. Quality Gate & Deploy | 4/8 | In Progress|  |
