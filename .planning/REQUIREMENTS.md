@@ -36,7 +36,7 @@
 ### Quality & Delivery
 
 - [x] **QUAL-01**: Core logic (code extraction/parsing) is covered by unit tests (Vitest + RTL)
-- [x] **QUAL-02**: The generate-to-preview flow is covered by an e2e test (Playwright)
+- [ ] **QUAL-02**: The generate-to-preview flow is covered by an e2e test (Playwright)
 - [ ] **QUAL-03**: CI runs lint, test, and build on every push (GitHub Actions)
 - [ ] **QUAL-04**: App deploys publicly on Vercel with a shareable link
 - [ ] **QUAL-05**: README documents setup (Gemini API key), architecture, and key trade-offs
@@ -88,7 +88,7 @@ Mapped during roadmap creation (2026-10-15).
 | UX-03 | Phase 3 | Complete |
 | UX-04 | Phase 3 | Complete |
 | QUAL-01 | Phase 4 | Complete |
-| QUAL-02 | Phase 4 | Complete |
+| QUAL-02 | Phase 4 | Pending |
 | QUAL-03 | Phase 4 | Pending |
 | QUAL-04 | Phase 4 | Pending |
 | QUAL-05 | Phase 4 | Pending |
