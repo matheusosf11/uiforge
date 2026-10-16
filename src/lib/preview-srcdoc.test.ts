@@ -23,6 +23,30 @@ describe("rewriteGeneratedCodeForPreview", () => {
     expect(rewritten).toContain("const __Generated = function Button()");
     expect(rewritten).not.toMatch(/export\s+default/);
   });
+
+  it("strips semicolon-free import type without eating following code", () => {
+    const code = `import type { Props } from "./types"
+const label = "keep me";
+export default function A() {
+  return <p>{label}</p>;
+}`;
+    const rewritten = rewriteGeneratedCodeForPreview(code);
+    expect(rewritten).not.toContain("import type");
+    expect(rewritten).toContain('const label = "keep me";');
+    expect(rewritten).toContain("const __Generated = function A()");
+  });
+
+  it("strips multi-line and semicolon-terminated import type", () => {
+    const code = `import type {
+  A,
+  B,
+} from "./types";
+export default function C() { return null; }`;
+    const rewritten = rewriteGeneratedCodeForPreview(code);
+    expect(rewritten).not.toContain("import type");
+    expect(rewritten).not.toContain("./types");
+    expect(rewritten).toContain("const __Generated = function C()");
+  });
 });
 
 describe("buildPreviewSrcdoc", () => {

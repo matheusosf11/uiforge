@@ -3,7 +3,7 @@ const REACT_IMPORT =
 
 export function rewriteGeneratedCodeForPreview(code: string): string {
   let next = code.trim();
-  next = next.replace(/import\s+type\s+[^;]+;?/g, "");
+  next = next.replace(/^[ \t]*import[ \t]+type\b(?:\{[^}]*\}|[^\n;{])*(?:;|$)/gm, "");
   next = next.replace(REACT_IMPORT, (_match, spec: string) => {
     const trimmed = spec.trim();
     const named = trimmed.match(/\{([^}]+)\}/);
