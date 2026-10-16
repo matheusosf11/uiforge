@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { buildPreviewSrcdoc } from "@/lib/preview-srcdoc";
-import { hasDefaultExport } from "@/lib/sandpack-files";
+import { hasDefaultExport } from "@/lib/has-default-export";
 
 export function SandboxPreview({ code }: { code: string }) {
   const srcDoc = useMemo(() => buildPreviewSrcdoc(code), [code]);
