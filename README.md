@@ -6,10 +6,10 @@ Describe a UI component in plain language and watch React + Tailwind code stream
 
 ## Badges and live demo
 
-[![CI](https://github.com/OWNER/REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/ci.yml)
+[![CI](https://github.com/matheusosf11/uiforge/actions/workflows/ci.yml/badge.svg)](https://github.com/matheusosf11/uiforge/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Live demo: DEPLOY_URL
+Live demo: https://uiforge-orlasup-project.vercel.app
 
 ## Screenshots
 

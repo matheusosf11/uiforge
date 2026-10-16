@@ -6,10 +6,10 @@ Descreva um componente de interface em linguagem natural e veja o código React 
 
 ## Badges e demo ao vivo
 
-[![CI](https://github.com/OWNER/REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/ci.yml)
+[![CI](https://github.com/matheusosf11/uiforge/actions/workflows/ci.yml/badge.svg)](https://github.com/matheusosf11/uiforge/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Demo ao vivo: DEPLOY_URL
+Demo ao vivo: https://uiforge-orlasup-project.vercel.app
 
 ## Screenshots
 
