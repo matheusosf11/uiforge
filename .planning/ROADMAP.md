@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Foundation & Streaming Generation** - Prompt → clean React/Tailwind code streaming live into a code view (completed 2026-10-15)
 - [x] **Phase 2: Sandboxed Live Preview** - Generated code renders safely in an isolated Sandpack iframe with Tailwind (completed 2026-10-15)
 - [x] **Phase 3: Export, Examples & Accessible UX** - Copy/download, example gallery, theme, responsive layout, accessible states & error recovery (completed 2026-10-15)
-- [ ] **Phase 4: Quality Gate & Deploy** - Tests, CI, public Vercel deploy, and documentation
+- [x] **Phase 4: Quality Gate & Deploy** - Tests, CI, public Vercel deploy, and documentation (completed 2026-10-16)
 
 ## Phase Details
 
@@ -147,7 +147,7 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 04-08-PLAN.md — Vercel import, GitHub About, real URLs/badge, live smoke test (checkpoints)
+- [x] 04-08-PLAN.md — Vercel import, GitHub About, real URLs/badge, live smoke test (checkpoints)
 
 ## Progress
 
@@ -159,4 +159,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Foundation & Streaming Generation | 4/4 | Complete    | 2026-10-15 |
 | 2. Sandboxed Live Preview | 2/2 | Complete   | 2026-10-15 |
 | 3. Export, Examples & Accessible UX | 3/3 | Complete   | 2026-10-15 |
-| 4. Quality Gate & Deploy | 7/8 | In Progress|  |
+| 4. Quality Gate & Deploy | 8/8 | Complete   | 2026-10-16 |
