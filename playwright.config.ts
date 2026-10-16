@@ -18,7 +18,7 @@ export default defineConfig({
   webServer: {
     command: "npm run e2e:server",
     url: baseURL,
-    reuseExistingServer: !isCI,
+    reuseExistingServer: false,
     timeout: 240000,
     // Test-only flags: never put these in .env files or Vercel (D-02).
     env: { UIFORGE_E2E_MOCK: "1", RATE_LIMIT_MAX: "1000" },
