@@ -29,9 +29,10 @@ export function buildPreviewSrcdoc(code: string): string {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="color-scheme" content="light dark" />
+    <meta name="color-scheme" content="light" />
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.3/dist/index.global.js"></script>
     <style>
+      html { color-scheme: light; }
       html, body, #root { margin: 0; min-height: 100%; background: #fff; color: #0f172a; }
       body { font-family: ui-sans-serif, system-ui, sans-serif; padding: 1.5rem; }
       #uiforge-error {
