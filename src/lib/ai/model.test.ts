@@ -1,5 +1,5 @@
 /// <reference types="vitest/globals" />
-import { getModel, isE2EMock } from "./model";
+import { MODEL_IDS, getModels, isE2EMock } from "./model";
 import { FIXED_COMPONENT, createE2EMockModel } from "./mock-model";
 
 afterEach(() => {
@@ -29,18 +29,21 @@ describe("isE2EMock", () => {
   });
 });
 
-describe("getModel", () => {
-  it("returns the mock model in mock mode", async () => {
+describe("getModels", () => {
+  it("returns only the mock model in mock mode", async () => {
     vi.stubEnv("UIFORGE_E2E_MOCK", "1");
-    const m = await getModel("x");
-    expect(m).toHaveProperty("doStream");
-    expect((m as { provider: string }).provider).not.toContain("google");
+    const ms = await getModels("x");
+    expect(ms).toHaveLength(1);
+    expect(ms[0]).toHaveProperty("doStream");
+    expect((ms[0] as { provider: string }).provider).not.toContain("google");
   });
 
-  it("returns the google model otherwise", async () => {
+  it("returns the google fallback chain otherwise", async () => {
     vi.stubEnv("UIFORGE_E2E_MOCK", undefined);
-    const m = await getModel("x");
-    expect((m as { provider: string }).provider).toContain("google");
+    const ms = await getModels("x");
+    expect(ms).toHaveLength(MODEL_IDS.length);
+    expect(ms.map((m) => (m as { modelId: string }).modelId)).toEqual([...MODEL_IDS]);
+    for (const m of ms) expect((m as { provider: string }).provider).toContain("google");
   });
 });
 

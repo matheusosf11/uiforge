@@ -1,6 +1,6 @@
 import { streamText } from "ai";
 import { z } from "zod";
-import { getModel, isE2EMock } from "@/lib/ai/model";
+import { getModels, isE2EMock } from "@/lib/ai/model";
 import { SYSTEM_PROMPT } from "@/lib/ai/prompt";
 import { isRateLimitError } from "@/lib/generate-error";
 import { MAX_PROMPT_LENGTH } from "@/lib/prompt-limits";
@@ -35,47 +35,28 @@ export async function POST(req: Request) {
     );
   }
 
-  const result = streamText({
-    model: await getModel(parsed.prompt),
-    system: SYSTEM_PROMPT,
-    prompt: parsed.prompt,
-    // Client disconnect/"Parar" cancels the provider request (and quota use).
-    abortSignal: req.signal,
-  });
-
-  // Peek the full stream until the first text delta so a provider failure
-  // (e.g. 429) can be reported as a real HTTP status before any byte is sent.
-  const reader = result.fullStream.getReader();
+  // Try each model in order until one yields a first text delta. Failures
+  // before any byte is sent (503 "high demand", per-model 429 quota, empty
+  // stream) fall through to the next model; the last failure is reported.
   const encoder = new TextEncoder();
-  let firstDelta: string | null = null;
-  // Early returns below never hand the reader to a response body, so cancel
-  // it explicitly to stop consuming the provider stream.
-  const cancelReader = () => void reader.cancel().catch(() => {});
-
-  try {
-    while (firstDelta === null) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (value.type === "text-delta") {
-        firstDelta = value.text;
-      } else if (value.type === "error") {
-        cancelReader();
-        return failureResponse(value.error);
-      } else if (value.type === "abort") {
-        break;
-      }
+  let opened: Opened | null = null;
+  let lastFailure: Response = new Response("generate_failed", { status: 502 });
+  for (const model of await getModels(parsed.prompt)) {
+    if (req.signal.aborted) break;
+    const attempt = await openStream(model, parsed.prompt, req.signal);
+    if ("failure" in attempt) {
+      lastFailure = attempt.failure;
+      continue;
     }
-  } catch (error) {
-    cancelReader();
-    return failureResponse(error);
+    opened = attempt;
+    break;
   }
+  if (!opened) return lastFailure;
 
-  if (firstDelta === null) {
-    cancelReader();
-    return new Response("generate_failed", { status: 502 });
-  }
-
+  const { reader, firstDelta } = opened;
+  const cancelReader = () => void reader.cancel().catch(() => {});
   const first = firstDelta;
+
   // Plain text stream protocol (not the UI-message protocol).
   const readable = new ReadableStream<Uint8Array>({
     start(controller) {
@@ -118,6 +99,57 @@ export async function POST(req: Request) {
   return new Response(readable, {
     headers: { "content-type": "text/plain; charset=utf-8" },
   });
+}
+
+type Model = Awaited<ReturnType<typeof getModels>>[number];
+type FullStreamReader = ReadableStreamDefaultReader<
+  ReturnType<typeof streamText>["fullStream"] extends ReadableStream<infer P>
+    ? P
+    : never
+>;
+type Opened = { reader: FullStreamReader; firstDelta: string };
+
+// Peek one model's full stream until the first text delta so a provider
+// failure (e.g. 429/503) can be reported as a real HTTP status — or trigger
+// the next fallback model — before any byte is sent.
+async function openStream(
+  model: Model,
+  prompt: string,
+  abortSignal: AbortSignal,
+): Promise<Opened | { failure: Response }> {
+  const result = streamText({
+    model,
+    system: SYSTEM_PROMPT,
+    prompt,
+    // Client disconnect/"Parar" cancels the provider request (and quota use).
+    abortSignal,
+    // One SDK retry per model keeps the whole chain under maxDuration; the
+    // fallback chain is the main resilience mechanism.
+    maxRetries: 1,
+  });
+
+  const reader = result.fullStream.getReader();
+  // Failure paths never hand the reader to a response body, so cancel it
+  // explicitly to stop consuming the provider stream.
+  const fail = (failure: Response) => {
+    void reader.cancel().catch(() => {});
+    return { failure };
+  };
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value.type === "text-delta") {
+        return { reader, firstDelta: value.text };
+      }
+      if (value.type === "error") return fail(failureResponse(value.error));
+      if (value.type === "abort") break;
+    }
+  } catch (error) {
+    return fail(failureResponse(error));
+  }
+  return fail(new Response("generate_failed", { status: 502 }));
 }
 
 function failureResponse(error: unknown) {

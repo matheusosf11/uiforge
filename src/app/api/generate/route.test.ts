@@ -1,39 +1,56 @@
 // @vitest-environment node
 /// <reference types="vitest/globals" />
-import { APICallError } from "ai";
+import { APICallError, streamText } from "ai";
 
 type Part = Record<string, unknown>;
 
-const state: { parts: Part[]; readError?: unknown } = { parts: [] };
+const state: {
+  parts: Part[];
+  readError?: unknown;
+  // Per-model parts for fallback tests: each streamText call shifts one.
+  perCall?: Part[][];
+  models: number;
+} = { parts: [], models: 1 };
 
 vi.mock("ai", async () => {
   const actual = await vi.importActual<typeof import("ai")>("ai");
   return {
     ...actual,
-    streamText: vi.fn(() => ({
-      fullStream: new ReadableStream<Part>({
-        pull(controller) {
-          if (state.readError) {
-            controller.error(state.readError);
-            return;
-          }
-          const next = state.parts.shift();
-          if (next) controller.enqueue(next);
-          else controller.close();
-        },
-      }),
-    })),
+    streamText: vi.fn(() => {
+      const parts = state.perCall ? (state.perCall.shift() ?? []) : state.parts;
+      return {
+        fullStream: new ReadableStream<Part>({
+          pull(controller) {
+            if (state.readError) {
+              controller.error(state.readError);
+              return;
+            }
+            const next = parts.shift();
+            if (next) controller.enqueue(next);
+            else controller.close();
+          },
+        }),
+      };
+    }),
   };
 });
 const mockFlag = vi.hoisted(() => ({ on: false }));
 vi.mock("@/lib/ai/model", () => ({
-  getModel: async () => ({}),
+  getModels: async () => Array.from({ length: state.models }, () => ({})),
   isE2EMock: () => mockFlag.on,
 }));
 vi.mock("@/lib/ai/prompt", () => ({ SYSTEM_PROMPT: "sys" }));
 
 import { __resetRateLimit } from "@/lib/rate-limit";
 import { POST } from "./route";
+
+const api503 = () =>
+  new APICallError({
+    message: "This model is currently experiencing high demand.",
+    url: "u",
+    requestBodyValues: {},
+    statusCode: 503,
+  });
 
 const api429 = () =>
   new APICallError({
@@ -52,9 +69,12 @@ function req(body: unknown, headers?: Record<string, string>) {
 }
 
 beforeEach(() => {
+  vi.mocked(streamText).mockClear();
   process.env.GOOGLE_GENERATIVE_AI_API_KEY = "k";
   state.parts = [];
   state.readError = undefined;
+  state.perCall = undefined;
+  state.models = 1;
   mockFlag.on = false;
   __resetRateLimit();
   // Forwarded IP headers are only trusted on Vercel (WR-02).
@@ -180,5 +200,34 @@ describe("POST /api/generate", () => {
     const res = await POST(req({ prompt: "x" }));
     expect(res.status).toBe(200);
     expect(await res.text()).toBe("ok");
+  });
+
+  it("503 no primeiro modelo cai para o proximo e faz streaming", async () => {
+    state.models = 3;
+    state.perCall = [
+      [{ type: "start" }, { type: "error", error: api503() }],
+      [{ type: "text-delta", text: "ok" }, { type: "finish" }],
+    ];
+    const res = await POST(req({ prompt: "x" }));
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe("ok");
+    expect(vi.mocked(streamText)).toHaveBeenCalledTimes(2);
+  });
+
+  it("todos os modelos falhando devolve a ultima falha", async () => {
+    state.models = 2;
+    state.perCall = [
+      [{ type: "error", error: api503() }],
+      [{ type: "error", error: api429() }],
+    ];
+    const res = await POST(req({ prompt: "x" }));
+    expect(res.status).toBe(429);
+    expect(await res.text()).toBe("rate_limited");
+  });
+
+  it("usa no maximo 1 retry do SDK por modelo", async () => {
+    state.parts = [{ type: "text-delta", text: "a" }];
+    await POST(req({ prompt: "x" }));
+    expect(vi.mocked(streamText).mock.lastCall?.[0]).toMatchObject({ maxRetries: 1 });
   });
 });
