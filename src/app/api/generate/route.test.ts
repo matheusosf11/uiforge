@@ -57,6 +57,12 @@ beforeEach(() => {
   state.readError = undefined;
   mockFlag.on = false;
   __resetRateLimit();
+  // Forwarded IP headers are only trusted on Vercel (WR-02).
+  vi.stubEnv("VERCEL", "1");
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
 });
 
 describe("POST /api/generate", () => {
