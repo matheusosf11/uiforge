@@ -59,7 +59,7 @@ Useful scripts: `npm test`, `npm run typecheck`, `npm run lint`, `npm run test:c
 ```mermaid
 flowchart LR
   A[Client shell<br/>prompt form] -->|POST /api/generate| B[Route handler<br/>zod + rate limit]
-  B -->|streamText| C[Gemini 2.5 Flash<br/>or mock model in e2e]
+  B -->|streamText| C[Gemini (gemini-3.8-flash)<br/>or mock model in e2e]
   C -->|text deltas| B
   B -->|plain text stream| A
   A --> D[parse-code<br/>extract component]
