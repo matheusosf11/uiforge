@@ -461,11 +461,11 @@ test("generate -> stream -> preview", async ({ page }) => {
 | A8 | `&&` command in Playwright webServer works on Windows | Pattern 5 | Use npm script `e2e:server` (recommended) |
 | A9 | Exact V4 `finish` part shape (finishReason/usage) | Pattern 1 | Read `LanguageModelV4StreamPart` finish member in `@ai-sdk/provider/dist/index.d.ts` before coding |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **GitHub owner/repo name and final `*.vercel.app` URL** - unknown until user confirms; README and `metadataBase` need it. Recommendation: README uses placeholders then a final task (post-deploy checkpoint) fills the real URL and badge.
-2. **Which OG image source** - static designed PNG vs Playwright screenshot. Recommendation: screenshot-derived 1200x630.
-3. **Delete Sandpack leftovers?** Verified unused; recommended as an isolated cleanup task.
+1. **GitHub owner/repo name and final `*.vercel.app` URL** - unknown until user confirms; README and `metadataBase` need it. Recommendation: README uses placeholders then a final task (post-deploy checkpoint) fills the real URL and badge. **RESOLVED:** placeholders `OWNER`/`REPO`/`DEPLOY_URL` in 04-06, replaced post-deploy in 04-08.
+2. **Which OG image source** - static designed PNG vs Playwright screenshot. Recommendation: screenshot-derived 1200x630. **RESOLVED:** 04-05 uses `src/app/opengraph-image.tsx` (`next/og` ImageResponse), no binary asset.
+3. **Delete Sandpack leftovers?** Verified unused; recommended as an isolated cleanup task. **RESOLVED:** 04-03 Task 2 deletes after a grep re-check (fallback: keep files if an importer appears).
 
 ## Environment Availability
 
