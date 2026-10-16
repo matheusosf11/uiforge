@@ -14,7 +14,7 @@ updated: 2026-10-16T00:00:00Z
 
 ### 1. Geração real no navegador na URL pública (https://uiforge-orlasup-project.vercel.app)
 expected: Status muda de "Gerando…" para "Pronto" e o preview renderiza o componente gerado pelo gemini-3.8-flash, sem tela de login da Vercel
-result: [pending]
+result: passed (usuário confirmou em 2026-10-16)
 
 ### 2. Gravar docs/demo.gif (prompt → streaming → preview) e descomentar o link no README
 expected: GIF curto em docs/demo.gif referenciado em README.md e README.pt-BR.md (não bloqueante)
@@ -23,9 +23,9 @@ result: [pending]
 ## Summary
 
 total: 2
-passed: 0
+passed: 1
 issues: 0
-pending: 2
+pending: 1
 skipped: 0
 blocked: 0
 

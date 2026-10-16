@@ -18,11 +18,12 @@ A user types a prompt and gets working, previewable React + Tailwind component c
 - ✓ User can copy and download the generated code — Validated in Phase 3: Export, Examples & Accessible UX
 - ✓ User can pick from a gallery of example prompts to seed generation — Validated in Phase 3: Export, Examples & Accessible UX
 - ✓ UI supports light/dark theme, is responsive, and handles loading/empty/error states accessibly — Validated in Phase 3 (human UAT pending in 03-HUMAN-UAT.md)
+- ✓ Generated component renders live in a secure sandboxed preview (sandboxed srcdoc iframe, always-light) — Validated in Phase 4 (sandbox invariant test + e2e; live generation confirmed by user)
+- ✓ Project is covered by unit tests (Vitest, 87) and an e2e test (Playwright, 4 scenarios), runs in CI (GitHub Actions), and deploys publicly on Vercel — Validated in Phase 4: https://uiforge-orlasup-project.vercel.app · https://github.com/matheusosf11/uiforge
 
 ### Active
 
-- [ ] Generated component renders live in a secure sandboxed preview (sandboxed srcdoc iframe)
-- [ ] Project is covered by unit tests (Vitest) and an e2e test (Playwright), runs in CI (GitHub Actions), and deploys publicly on Vercel
+(none — v1.0 scope complete)
 
 ### Out of Scope
 
@@ -55,8 +56,10 @@ A user types a prompt and gets working, previewable React + Tailwind component c
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
 | Project: UIForge (AI component generator) | Best demonstrates front-end skill while using modern AI; recognizable product category | — Pending |
-| Google Gemini via Vercel AI SDK | Generous free tier + first-class streaming support | — Pending |
-| Sandpack for live preview + editor | Safe sandboxed execution of generated code; professional tooling | — Pending |
+| Google Gemini via Vercel AI SDK | Generous free tier + first-class streaming support | ✓ Shipped — model gemini-3.8-flash (2.5-flash unavailable to new keys, Phase 4) |
+| Sandpack for live preview + editor | Safe sandboxed execution of generated code; professional tooling | ✗ Replaced by sandboxed srcdoc iframe; Sandpack removed in Phase 4 |
+| Best-effort in-memory rate limit (5/min/IP) | Protect free-tier quota on public demo without infra | ✓ Shipped Phase 4; distributed limit stays v2 (PLAT-01) |
+| E2E with env-gated mock model | Deterministic, free CI without API key | ✓ Shipped Phase 4 (never active on Vercel Production) |
 | Next.js 15 App Router + TypeScript | User's primary stack; modern RSC/Server Actions story | — Pending |
 | No authentication in v1 | Keeps portfolio demo frictionless | — Pending |
 
@@ -78,4 +81,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-15 after Phase 3 completion*
+*Last updated: 2026-10-16 after Phase 4 completion (v1.0 shipped)*
