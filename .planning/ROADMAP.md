@@ -100,7 +100,7 @@
 | 2. Sandboxed Live Preview | v1.0 | 2/2 | Complete | 2026-10-15 |
 | 3. Export, Examples & Accessible UX | v1.0 | 3/3 | Complete | 2026-10-15 |
 | 4. Quality Gate & Deploy | v1.0 | 8/8 | Complete | 2026-10-16 |
-| 5. Refine API Contract & Edit Prompt | v1.1 | 2/2 | Complete   | 2026-10-17 |
+| 5. Refine API Contract & Edit Prompt | v1.1 | 2/2 | Complete    | 2026-10-17 |
 | 6. Session Core & Refine Loop | v1.1 | 0/0 | Not started | - |
 | 7. Turn List & Version Navigation | v1.1 | 0/0 | Not started | - |
 | 8. Editable Code View | v1.1 | 0/0 | Not started | - |

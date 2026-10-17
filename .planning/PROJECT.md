@@ -35,7 +35,7 @@ A user types a prompt and gets working, previewable React + Tailwind component c
 
 ### Active
 
-- [ ] Iterative refinement: after the first generation, a follow-up prompt edits the current component (current code + instruction sent to the model); "Novo componente" starts from scratch
+- [ ] Iterative refinement: after the first generation, a follow-up prompt edits the current component (current code + instruction sent to the model); "Novo componente" starts from scratch — server contract done in Phase 5 (`currentCode`, edit prompt, 413, non-stop finish = failure); UI in Phase 6
 - [ ] In-memory version history within the session (go back to a previous version)
 - [ ] Visible list of turns (prompts sent in the session, mini-chat style)
 - [ ] Editable code: user edits in the code view and refinement uses the edited version
@@ -99,4 +99,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-17 — milestone v1.1 started*
+*Last updated: 2026-10-17 — Phase 5 (refine API contract) complete*
