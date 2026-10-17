@@ -12,7 +12,11 @@ export const maxDuration = 60; // Vercel Hobby allows up to 300; prevents stream
 // Gemini thinking tokens count toward this budget (D-10).
 const MAX_OUTPUT_TOKENS = 32_768;
 // Defense in depth: reject absurd bodies before parsing JSON.
-const MAX_BODY_BYTES = 200_000;
+// Derivation: the worst case JSON escaping costs 6 bytes per UTF-16 unit
+// (control chars become \u00XX; non-BMP chars are 4 UTF-8 bytes per 2 units).
+// (30_000 code + 2_000 prompt) * 6 = 192_000, plus envelope/keys, is ~193 KB.
+// 256_000 leaves margin so a legitimate max-size body never trips the guard.
+const MAX_BODY_BYTES = 256_000;
 
 // Whitespace-only/null/absent currentCode means generate mode (D-08); real
 // code keeps its original untrimmed text. No .max here: oversize is a 413.

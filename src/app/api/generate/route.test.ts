@@ -295,6 +295,25 @@ describe("POST /api/generate", () => {
       await next.text();
     });
 
+    it("corpo maximo legitimo com escape pior caso (6 bytes/unidade) nao vira 413", async () => {
+      state.parts = [{ type: "text-delta", text: "a" }];
+      const body = {
+        prompt: "\u0001".repeat(2000),
+        currentCode: "\u0001".repeat(30_000),
+      };
+      const raw = JSON.stringify(body);
+      expect(raw.length).toBeGreaterThan(190_000);
+      const res = await POST(
+        new Request("http://localhost/api/generate", {
+          method: "POST",
+          body: raw,
+          headers: { "content-length": String(Buffer.byteLength(raw)) },
+        }),
+      );
+      expect(res.status).toBe(200);
+      await res.text();
+    });
+
     it("prompt > 2000 com currentCode vira 400", async () => {
       const res = await POST(req({ prompt: "x".repeat(2001), currentCode: "code" }));
       expect(res.status).toBe(400);
