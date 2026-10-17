@@ -12,31 +12,34 @@ A user types a prompt and gets working, previewable React + Tailwind component c
 
 ### Validated
 
-- ✓ User can describe a UI component in a text prompt and submit it — Phase 1
-- ✓ App generates a single self-contained React + Tailwind component via Google Gemini (free tier) using the Vercel AI SDK — Phase 1
-- ✓ Generated code streams token-by-token into a code view in real time — Phase 1
-- ✓ User can copy and download the generated code — Validated in Phase 3: Export, Examples & Accessible UX
-- ✓ User can pick from a gallery of example prompts to seed generation — Validated in Phase 3: Export, Examples & Accessible UX
-- ✓ UI supports light/dark theme, is responsive, and handles loading/empty/error states accessibly — Validated in Phase 3 (human UAT pending in 03-HUMAN-UAT.md)
-- ✓ Generated component renders live in a secure sandboxed preview (sandboxed srcdoc iframe, always-light) — Validated in Phase 4 (sandbox invariant test + e2e; live generation confirmed by user)
-- ✓ Project is covered by unit tests (Vitest, 87) and an e2e test (Playwright, 4 scenarios), runs in CI (GitHub Actions), and deploys publicly on Vercel — Validated in Phase 4: https://uiforge-orlasup-project.vercel.app · https://github.com/matheusosf11/uiforge
+- ✓ User can describe a UI component in a text prompt and submit it — v1.0
+- ✓ App generates a single self-contained React + Tailwind component via Google Gemini (free tier) using the Vercel AI SDK, falling back across Gemini models on 503/429 — v1.0
+- ✓ Generated code streams token-by-token into a code view in real time — v1.0
+- ✓ Generated component renders live in a secure sandboxed preview (allow-scripts-only srcdoc iframe, always light, self-hosted runtime) — v1.0
+- ✓ User can copy and download the generated code — v1.0
+- ✓ User can pick from a gallery of example prompts to seed generation — v1.0
+- ✓ UI supports light/dark theme, is responsive, and handles loading/empty/error states accessibly — v1.0
+- ✓ Covered by unit tests (Vitest, 93) and e2e (Playwright), runs in CI (GitHub Actions), deploys publicly on Vercel — v1.0
 
 ### Active
 
-(none — v1.0 scope complete)
+Next milestone not defined yet — run `/gsd-new-milestone`. Candidates surfaced during v1.0:
+
+- [ ] Iterative refinement: a follow-up prompt edits the current component instead of generating from scratch (users already try this)
+- [ ] Demo GIF (`docs/demo.gif`) linked from both READMEs
 
 ### Out of Scope
 
 - User authentication / accounts — portfolio demo, keeps v1 simple and frictionless
 - Persistent history of generations — not needed for the core demo loop
-- Iterative refinement ("change the color") — deferred to a later version
 - Distributed rate limiting (e.g. Upstash, PLAT-01) — out of scope / v2. A best-effort in-memory per-IP limit (5 generations/minute, per serverless instance) ships in Phase 4 as a partial, deliberate pull-forward
 - Multi-file / full-project generation — v1 focuses on a single component
 
 ## Context
 
+**Current state (v1.0 shipped 2026-10-17):** ~2,700 LOC TypeScript/TSX. Next.js 15.5 App Router, React 19, Tailwind v4, shadcn/ui, Vercel AI SDK v7 + @ai-sdk/google (gemini-3.8-flash primary). Live at https://uiforge-orlasup-project.vercel.app. Known issue found after launch and fixed: browser extensions blocking jsDelivr blanked the preview, so the preview runtime is now self-hosted. Each prompt is generated from scratch (no conversation context).
+
 - Target user: the project owner, a front-end developer building a portfolio to attract recruiters at large companies.
-- Primary stack chosen: React + Next.js 15 (App Router) with TypeScript.
 - AI must use a free tier: Google Gemini via Vercel AI SDK (Groq is a documented fallback).
 - Live preview must run untrusted/generated code safely — the preview renders inside an isolated sandboxed srcdoc iframe, never on the main page.
 - The project doubles as a conversation piece in interviews (streaming UX, sandboxed execution, modern RSC/App Router architecture).
@@ -55,13 +58,15 @@ A user types a prompt and gets working, previewable React + Tailwind component c
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Project: UIForge (AI component generator) | Best demonstrates front-end skill while using modern AI; recognizable product category | — Pending |
+| Project: UIForge (AI component generator) | Best demonstrates front-end skill while using modern AI; recognizable product category | ✓ Good — shipped v1.0 |
 | Google Gemini via Vercel AI SDK | Generous free tier + first-class streaming support | ✓ Shipped — model gemini-3.8-flash (2.5-flash unavailable to new keys, Phase 4) |
 | Sandpack for live preview + editor | Safe sandboxed execution of generated code; professional tooling | ✗ Replaced by sandboxed srcdoc iframe; Sandpack removed in Phase 4 |
 | Best-effort in-memory rate limit (5/min/IP) | Protect free-tier quota on public demo without infra | ✓ Shipped Phase 4; distributed limit stays v2 (PLAT-01) |
 | E2E with env-gated mock model | Deterministic, free CI without API key | ✓ Shipped Phase 4 (never active on Vercel Production) |
-| Next.js 15 App Router + TypeScript | User's primary stack; modern RSC/Server Actions story | — Pending |
-| No authentication in v1 | Keeps portfolio demo frictionless | — Pending |
+| Next.js 15 App Router + TypeScript | User's primary stack; modern RSC/Server Actions story | ✓ Good |
+| No authentication in v1 | Keeps portfolio demo frictionless | ✓ Good |
+| Self-host preview runtime (React/Babel/Tailwind) in public/ | jsDelivr blocked by ad/privacy extensions left preview blank for real users | ✓ Shipped 2026-10-17 with 15s load watchdog |
+| Gemini model fallback chain (3.8-flash → 3.6-flash → 3.5-flash-lite) | Free-tier 503 "high demand" / per-model 429 | ✓ Good |
 
 ## Evolution
 
@@ -81,4 +86,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-16 after Phase 4 completion (v1.0 shipped)*
+*Last updated: 2026-10-17 after v1.0 milestone*
