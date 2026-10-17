@@ -11,8 +11,8 @@ Requirements for this milestone. Each maps to roadmap phases. IDs continue from 
 ### Iterative Refinement
 
 - [ ] **ITER-01**: User can refine the current component with a follow-up instruction; after the first generation the prompt input refines by default (button/placeholder change from "Gerar" to "Refinar")
-- [ ] **ITER-03**: Refinement sends only the current code + the new instruction to the model (no prompt history), via an optional `currentCode` field with its own size limit (~30k chars); oversized code shows a friendly message offering "Novo componente"
-- [ ] **ITER-04**: The model returns the complete updated component (not a diff), preserving everything not requested; the current code is treated as data, not instructions
+- [x] **ITER-03**: Refinement sends only the current code + the new instruction to the model (no prompt history), via an optional `currentCode` field with its own size limit (~30k chars); oversized code shows a friendly message offering "Novo componente"
+- [x] **ITER-04**: The model returns the complete updated component (not a diff), preserving everything not requested; the current code is treated as data, not instructions
 - [ ] **ITER-05**: A refined result is only accepted as a new version if the stream completes cleanly and the code is valid (non-empty, has `export default`)
 - [ ] **ITER-06**: User can start over with "Novo componente", which clears the session (confirms first if there are multiple versions or manual edits)
 - [ ] **ITER-07**: If a refinement fails or the user stops it, the previous version stays visible in code and preview, and a retry reuses the same base code
@@ -78,8 +78,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ITER-03 | Phase 5 | Pending |
-| ITER-04 | Phase 5 | Pending |
+| ITER-03 | Phase 5 | Complete |
+| ITER-04 | Phase 5 | Complete |
 | ITER-01 | Phase 6 | Pending |
 | ITER-02 | Phase 6 | Pending |
 | ITER-05 | Phase 6 | Pending |
