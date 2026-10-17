@@ -37,6 +37,8 @@ No blockers found. The 413 path runs before the rate limiter. The generate syste
 
 ### WR-01: Content-length early reject is bypassable (absent or chunked body is unbounded)
 
+**Status: FIXED (b40a9bc)** - body read as text and byte-checked; header fast-reject kept; 413 stays before limiter.
+
 **File:** `src/app/api/generate/route.ts:28-31`
 **Issue:** `Number(null)` is `0`, so a missing header skips the guard. A chunked request or one with a lying header then goes to `await req.json()`, which buffers the whole body before any size check. The post-parse 413 only covers `currentCode`. The "defense in depth" intent of `MAX_BODY_BYTES` is not met, and this runs before the rate limiter, so it consumes no quota.
 **Fix:** Read the body as text with a byte cap, then parse it.
@@ -49,17 +51,23 @@ For a true streaming cap, read `req.body` with a counting reader. Also treat an 
 
 ### WR-02: Delimiter escaping is exact-case and exact-string only
 
+**Status: FIXED (5f7f087)** - regex neutralizes current_code and instruction tags (case-insensitive, whitespace-tolerant) in code and prompt; generate mode unchanged.
+
 **File:** `src/lib/ai/prompt.ts:60`
 **Issue:** Only the literal `</current_code>` is neutralized. `</CURRENT_CODE>`, `</current_code >` and `</current_code\n>` pass through, as do fake `<instruction>` blocks inside the code. The data block can still be closed or spoofed. The replacement `<\/current_code>` also alters user code that the model may echo back verbatim, which puts the escaped text into the output. The prompt (the instruction) is not escaped either, so a `</instruction>` in it is not neutralized.
 **Fix:** Use a case- and whitespace-tolerant regex that covers both tags, e.g. `/<(\/?)(current_code|instruction)(\s*>)/gi` → `<$1​$2$3`, or use a random per-request boundary token. Add tests for the case and whitespace variants.
 
 ### WR-03: Whitespace-only prompt passes validation
 
+**Status: FIXED (e54d0b6)** - prompt refined with trim check (400 in both modes).
+
 **File:** `src/app/api/generate/route.ts:20`
 **Issue:** `z.string().min(1)` accepts `"   "`. In edit mode this sends an empty `<instruction>` to the model, which costs quota for a meaningless request. Whitespace-only `currentCode` is handled (D-08), but the prompt gets no equivalent treatment.
 **Fix:** `z.string().refine((s) => s.trim().length > 0).max(MAX_PROMPT_LENGTH)`, or `.trim().min(1)`. Check the client first, in case it already trims.
 
 ### WR-04: Size limits mix bytes and characters
+
+**Status: FIXED (dbe5a5d)** - MAX_BODY_BYTES = 256_000 with documented derivation.
 
 **File:** `src/app/api/generate/route.ts:15,45`, `src/lib/prompt-limits.ts:5`
 **Issue:** `MAX_CODE_LENGTH` is 30,000 UTF-16 units and `MAX_BODY_BYTES` is 200,000 bytes. JSON escapes such as `é` or `\n` and 3-4 byte characters can push a legitimate 30k-character body over 200k bytes. The user would get a 413 from the header guard even though the code is under the limit. The worst case is about 30k × 6 bytes = 180k, plus the prompt (2000 × 6 = 12k) = 192k. That is close to the limit, so it is fragile and not documented.
