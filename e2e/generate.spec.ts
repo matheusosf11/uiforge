@@ -83,3 +83,53 @@ test.describe("mobile", () => {
     await expect(page.locator("#panel-preview")).toBeVisible();
   });
 });
+
+test.describe("refine smoke", () => {
+  const isGenerate = (r: import("@playwright/test").Request) =>
+    r.method() === "POST" && r.url().includes("/api/generate");
+
+  test("refine, then undo back to v1", async ({ page }) => {
+    await generate(page);
+    await expect(page.getByText("Pronto — v1")).toBeVisible({ timeout: 15000 });
+
+    const chip = page.getByRole("button", { name: "Cor mais forte" });
+    await expect(chip).toBeVisible({ timeout: 15000 });
+    const field = page.getByRole("textbox", { name: "Descreva a mudança" });
+    let generateCalls = 0;
+    page.on("request", (r) => {
+      if (isGenerate(r)) generateCalls++;
+    });
+    await chip.click();
+    await expect(field).toHaveValue(/cor de destaque mais forte/);
+    expect(generateCalls).toBe(0);
+
+    await page.getByRole("button", { name: "Refinar", exact: true }).click();
+    await expect(page.getByText("Atualizando…")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText("Pronto — v2")).toBeVisible({ timeout: 15000 });
+    await expect(page.locator(IFRAME)).toHaveAttribute("srcdoc", /Refinado/);
+    await expect(field).toHaveValue("");
+    await expect(page.getByText("v2 de 2")).toBeVisible();
+
+    await page.getByRole("button", { name: "Desfazer" }).click();
+    await expect(page.getByText("Voltou para v1")).toBeVisible();
+    const iframe = page.locator(IFRAME);
+    await expect(iframe).toHaveAttribute("srcdoc", /FixtureCard/);
+    await expect(iframe).not.toHaveAttribute("srcdoc", /Refinado/);
+  });
+
+  test("refine failure keeps v1 and shows the alert", async ({ page }) => {
+    await generate(page);
+    await expect(page.getByText("Pronto — v1")).toBeVisible({ timeout: 15000 });
+
+    const field = page.getByRole("textbox", { name: "Descreva a mudança" });
+    await field.fill("__e2e_error__ refine");
+    await page.getByRole("button", { name: "Refinar", exact: true }).click();
+
+    const alert = page.getByRole("alert").first();
+    await expect(alert).toBeVisible({ timeout: 15000 });
+    await expect(alert).toContainText("Sua versão anterior foi mantida");
+    await expect(page.locator(IFRAME)).toHaveAttribute("srcdoc", /FixtureCard/);
+    await expect(page.getByText("v1 de 1")).toBeVisible();
+    await expect(field).toHaveValue("__e2e_error__ refine");
+  });
+});
