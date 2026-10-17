@@ -20,6 +20,17 @@ export function rewriteGeneratedCodeForPreview(code: string): string {
   return next.trim();
 }
 
+// Runtime scripts are self-hosted from public/preview-runtime (same site as the
+// app) instead of a third-party CDN: ad/privacy blockers that block jsDelivr
+// left the iframe stuck on a blank page with no error. A srcdoc document
+// resolves root-relative URLs against the embedding page.
+export const PREVIEW_RUNTIME = {
+  tailwind: "/preview-runtime/tailwind-browser-4.3.3.js",
+  react: "/preview-runtime/react-18.3.1.development.js",
+  reactDom: "/preview-runtime/react-dom-18.3.1.development.js",
+  babel: "/preview-runtime/babel-standalone-7.28.5.min.js",
+} as const;
+
 export function buildPreviewSrcdoc(code: string): string {
   const rewritten = rewriteGeneratedCodeForPreview(code);
   const payload = JSON.stringify(rewritten).replace(/</g, "\\u003c");
@@ -30,7 +41,7 @@ export function buildPreviewSrcdoc(code: string): string {
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light" />
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.3/dist/index.global.js"></script>
+    <script src="${PREVIEW_RUNTIME.tailwind}"></script>
     <style>
       html { color-scheme: light; }
       html, body, #root { margin: 0; min-height: 100%; background: #fff; color: #0f172a; }
@@ -51,9 +62,9 @@ export function buildPreviewSrcdoc(code: string): string {
   <body>
     <pre id="uiforge-error"></pre>
     <div id="root"></div>
-    <script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.development.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.development.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.28.5/babel.min.js"></script>
+    <script src="${PREVIEW_RUNTIME.react}"></script>
+    <script src="${PREVIEW_RUNTIME.reactDom}"></script>
+    <script src="${PREVIEW_RUNTIME.babel}"></script>
     <script>
       (function () {
         var errorEl = document.getElementById("uiforge-error");

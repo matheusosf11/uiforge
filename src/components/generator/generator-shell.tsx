@@ -236,7 +236,11 @@ export function GeneratorShell() {
               <p className="text-sm text-muted-foreground">Gerando preview…</p>
             </section>
           ) : previewCode ? (
-            <SandboxPreview code={previewCode} />
+            <SandboxPreview
+              code={previewCode}
+              onRegenerate={retry}
+              regenerateDisabled={busy}
+            />
           ) : (
             <section
               aria-label="Live preview"

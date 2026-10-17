@@ -1,6 +1,7 @@
 /// <reference types="vitest/globals" />
 import {
   buildPreviewSrcdoc,
+  PREVIEW_RUNTIME,
   rewriteGeneratedCodeForPreview,
 } from "./preview-srcdoc";
 
@@ -50,11 +51,17 @@ export default function C() { return null; }`;
 });
 
 describe("buildPreviewSrcdoc", () => {
-  it("embeds Tailwind v4 as a pinned jsDelivr script", () => {
-    expect(buildPreviewSrcdoc(SAMPLE)).toContain(
-      "https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.3/dist/index.global.js",
+  it("loads the pinned runtime (Tailwind v4, React, Babel) from the app itself", () => {
+    const srcdoc = buildPreviewSrcdoc(SAMPLE);
+    expect(srcdoc).toContain(
+      '<script src="/preview-runtime/tailwind-browser-4.3.3.js"></script>',
     );
-    expect(buildPreviewSrcdoc(SAMPLE)).not.toContain("cdn.tailwindcss.com");
+    for (const src of Object.values(PREVIEW_RUNTIME)) {
+      expect(srcdoc).toContain(`src="${src}"`);
+    }
+    // Third-party CDNs get blocked by ad/privacy extensions (blank preview).
+    expect(srcdoc).not.toContain("cdn.jsdelivr.net");
+    expect(srcdoc).not.toContain("cdn.tailwindcss.com");
   });
 
   it("always declares color-scheme light (D-17)", () => {

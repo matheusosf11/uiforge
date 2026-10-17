@@ -4,7 +4,7 @@ import { google } from "@ai-sdk/google";
 // "high demand" or a per-model 429 quota), the route tries the next one.
 export const MODEL_IDS = [
   "gemini-3.8-flash",
-  "gemini-3.5-flash",
+  "gemini-3.6-flash",
   "gemini-3.5-flash-lite",
 ] as const;
 export const MODEL_ID = MODEL_IDS[0];
