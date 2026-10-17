@@ -78,12 +78,35 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (filled by roadmapper) | | |
+| ITER-03 | Phase 5 | Pending |
+| ITER-04 | Phase 5 | Pending |
+| ITER-01 | Phase 6 | Pending |
+| ITER-02 | Phase 6 | Pending |
+| ITER-05 | Phase 6 | Pending |
+| ITER-06 | Phase 6 | Pending |
+| ITER-07 | Phase 6 | Pending |
+| ITER-08 | Phase 6 | Pending |
+| ITER-09 | Phase 6 | Pending |
+| QUAL-06 | Phase 6 | Pending |
+| UX-05 | Phase 6 | Pending |
+| HIST-01 | Phase 7 | Pending |
+| HIST-02 | Phase 7 | Pending |
+| HIST-03 | Phase 7 | Pending |
+| HIST-04 | Phase 7 | Pending |
+| HIST-05 | Phase 7 | Pending |
+| EDIT-04 | Phase 8 | Pending |
+| EDIT-05 | Phase 8 | Pending |
+| EDIT-06 | Phase 8 | Pending |
+| EDIT-07 | Phase 8 | Pending |
+| EDIT-08 | Phase 8 | Pending |
+| DOCS-01 | Phase 9 | Pending |
+| DOCS-02 | Phase 9 | Pending |
+| QUAL-07 | Phase 9 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 24 total
-- Mapped to phases: 0
-- Unmapped: 24 ⚠️
+- Mapped to phases: 24
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-10-17*
