@@ -21,6 +21,8 @@ const eslintConfig = [
       "playwright-report/**",
       "test-results/**",
       "coverage/**",
+      // Vendored, minified preview runtime (React/Babel/Tailwind) served as-is.
+      "public/preview-runtime/**",
     ],
   },
 ];
