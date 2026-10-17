@@ -3,7 +3,7 @@ import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-background p-6 text-foreground md:p-8">
+    <main className="min-h-screen p-6 text-foreground md:p-8">
       <div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-6xl flex-col gap-6 md:min-h-[calc(100vh-4rem)]">
         <header className="flex flex-col gap-1">
           <div className="flex items-center justify-between gap-3">
