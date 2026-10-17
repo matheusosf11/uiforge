@@ -36,6 +36,48 @@ describe("SandboxPreview", () => {
     expect(onRegenerate).toHaveBeenCalledTimes(1);
   });
 
+  it("shows a plain Atualizando badge only when updating, without remounting", () => {
+    const code = "export default function A(){return <div/>}";
+    const { rerender } = render(<SandboxPreview code={code} />);
+    expect(screen.queryByText("Atualizando…")).toBeNull();
+    const before = screen.getByTitle("Live preview");
+    const srcdoc = before.getAttribute("srcdoc");
+
+    rerender(<SandboxPreview code={code} updating />);
+    const badge = screen.getByText("Atualizando…");
+    expect(badge.tagName).toBe("SPAN");
+    expect(badge.getAttribute("role")).toBeNull();
+    expect(badge.getAttribute("aria-live")).toBeNull();
+    expect(badge.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
+    const during = screen.getByTitle("Live preview");
+    expect(during).toBe(before);
+    expect(during.getAttribute("srcdoc")).toBe(srcdoc);
+
+    rerender(<SandboxPreview code={code} updating={false} />);
+    expect(screen.queryByText("Atualizando…")).toBeNull();
+    expect(screen.getByTitle("Live preview")).toBe(before);
+    expect(before.getAttribute("srcdoc")).toBe(srcdoc);
+  });
+
+  it("uses a custom regenerateLabel on the runtime-error button", () => {
+    render(
+      <SandboxPreview
+        code="export default function A(){return <div/>}"
+        onRegenerate={vi.fn()}
+        regenerateLabel="Tentar de novo"
+      />,
+    );
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          data: { type: "uiforge-preview-error", message: "boom" },
+        }),
+      );
+    });
+    expect(screen.getByRole("button", { name: /Tentar de novo/ })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Gerar de novo/ })).toBeNull();
+  });
+
   describe("load timeout", () => {
     beforeEach(() => vi.useFakeTimers());
     afterEach(() => vi.useRealTimers());

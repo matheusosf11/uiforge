@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { RotateCcw } from "lucide-react";
+import { Loader2, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { buildPreviewSrcdoc } from "@/lib/preview-srcdoc";
 import { hasDefaultExport } from "@/lib/has-default-export";
@@ -12,11 +12,17 @@ export function SandboxPreview({
   code,
   onRegenerate,
   regenerateDisabled = false,
+  updating = false,
+  regenerateLabel = "Gerar de novo",
 }: {
   code: string;
   /** Offered when the generated code fails to compile/run in the preview. */
   onRegenerate?: () => void;
   regenerateDisabled?: boolean;
+  /** Shows a non-live "Atualizando…" badge while a refinement streams. */
+  updating?: boolean;
+  /** Label of the runtime-error retry button. */
+  regenerateLabel?: string;
 }) {
   const srcDoc = useMemo(() => buildPreviewSrcdoc(code), [code]);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
@@ -60,9 +66,18 @@ export function SandboxPreview({
       aria-label="Live preview"
       className="flex min-h-64 min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card p-4"
     >
-      <h2 className="mb-2 text-sm font-medium text-muted-foreground">
-        Preview
-      </h2>
+      <div className="mb-2 flex items-center justify-between">
+        <h2 className="text-sm font-medium text-muted-foreground">Preview</h2>
+        {updating ? (
+          <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">
+            <Loader2
+              aria-hidden="true"
+              className="size-3 animate-spin motion-reduce:animate-none"
+            />
+            Atualizando…
+          </span>
+        ) : null}
+      </div>
       {missingDefault ? (
         <p
           role="alert"
@@ -87,7 +102,7 @@ export function SandboxPreview({
                 onClick={onRegenerate}
                 disabled={regenerateDisabled}
               >
-                <RotateCcw /> Gerar de novo
+                <RotateCcw /> {regenerateLabel}
               </Button>
             ) : null}
           </div>
