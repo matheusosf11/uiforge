@@ -314,6 +314,41 @@ describe("POST /api/generate", () => {
       await res.text();
     });
 
+    it("sem content-length, corpo real acima do limite vira 413 antes do limiter", async () => {
+      const raw = JSON.stringify({ prompt: "x", currentCode: "a".repeat(300_000) });
+      for (let i = 0; i < 6; i++) {
+        const stream = new ReadableStream<Uint8Array>({
+          start(c) {
+            c.enqueue(new TextEncoder().encode(raw));
+            c.close();
+          },
+        });
+        const res = await POST(
+          new Request("http://localhost/api/generate", {
+            method: "POST",
+            body: stream,
+            duplex: "half",
+          } as RequestInit),
+        );
+        expect(res.status).toBe(413);
+        expect(await res.text()).toBe("code_too_large");
+      }
+      expect(vi.mocked(streamText)).not.toHaveBeenCalled();
+    });
+
+    it("content-length falso (menor que o corpo) tambem vira 413", async () => {
+      const raw = JSON.stringify({ prompt: "x", currentCode: "a".repeat(300_000) });
+      const res = await POST(req(JSON.parse(raw), { "content-length": "10" }));
+      expect(res.status).toBe(413);
+    });
+
+    it("JSON invalido continua 400", async () => {
+      const res = await POST(
+        new Request("http://localhost/api/generate", { method: "POST", body: "{nope" }),
+      );
+      expect(res.status).toBe(400);
+    });
+
     it.each([[undefined], ["code"]])(
       "prompt so com espacos vira 400 (currentCode %j)",
       async (code) => {

@@ -32,13 +32,25 @@ const Body = z.object({
 });
 
 export async function POST(req: Request) {
-  const declared = Number(req.headers.get("content-length"));
+  // Fast reject on a declared length; absent/invalid/lying headers are caught
+  // by the byte check on the actual body below.
+  const header = req.headers.get("content-length");
+  const declared = header === null || header.trim() === "" ? NaN : Number(header);
   if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
+    return new Response("code_too_large", { status: 413 });
+  }
+  let raw: string;
+  try {
+    raw = await req.text();
+  } catch {
+    return new Response("Invalid request: unreadable body.", { status: 400 });
+  }
+  if (Buffer.byteLength(raw, "utf8") > MAX_BODY_BYTES) {
     return new Response("code_too_large", { status: 413 });
   }
   let parsed: z.infer<typeof Body>;
   try {
-    const result = Body.safeParse(await req.json());
+    const result = Body.safeParse(JSON.parse(raw));
     if (!result.success) throw new Error("invalid");
     parsed = result.data;
   } catch {
