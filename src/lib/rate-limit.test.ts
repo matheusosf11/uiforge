@@ -4,6 +4,7 @@ import {
   checkRateLimit,
   clientIp,
   getRateLimitConfig,
+  getSuggestRateLimitConfig,
 } from "./rate-limit";
 
 const cfg = { max: 5, windowMs: 60_000 };
@@ -134,5 +135,18 @@ describe("getRateLimitConfig", () => {
     expect(getRateLimitConfig()).toEqual({ max: 5, windowMs: 60_000 });
     vi.stubEnv("RATE_LIMIT_MAX", "0");
     expect(getRateLimitConfig().max).toBe(5);
+  });
+});
+
+describe("getSuggestRateLimitConfig", () => {
+  it("defaults to 10 per 60000ms", () => {
+    expect(getSuggestRateLimitConfig()).toEqual({ max: 10, windowMs: 60_000 });
+  });
+
+  it("reads SUGGEST_ env overrides and ignores RATE_LIMIT_MAX", () => {
+    vi.stubEnv("RATE_LIMIT_MAX", "99");
+    vi.stubEnv("SUGGEST_RATE_LIMIT_MAX", "3");
+    vi.stubEnv("SUGGEST_RATE_LIMIT_WINDOW_MS", "2000");
+    expect(getSuggestRateLimitConfig()).toEqual({ max: 3, windowMs: 2000 });
   });
 });

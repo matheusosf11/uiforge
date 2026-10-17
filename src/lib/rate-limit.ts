@@ -67,6 +67,14 @@ export function getRateLimitConfig(): RateLimitConfig {
   };
 }
 
+// Separate bucket config for /api/suggest (D-05); callers use a "suggest:" key prefix.
+export function getSuggestRateLimitConfig(): RateLimitConfig {
+  return {
+    max: positiveInt(process.env.SUGGEST_RATE_LIMIT_MAX, 10),
+    windowMs: positiveInt(process.env.SUGGEST_RATE_LIMIT_WINDOW_MS, DEFAULT_WINDOW_MS),
+  };
+}
+
 export function __resetRateLimit(): void {
   hits.clear();
 }

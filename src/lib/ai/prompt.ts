@@ -63,7 +63,7 @@ export function buildUserPrompt(prompt: string, currentCode?: string): string {
 // Case-insensitive and whitespace-tolerant: <\/current_code>, <\instruction>.
 const DELIMITER_TAG = /<\s*(\/?)\s*(current_code|instruction)\s*>/gi;
 
-function neutralizeDelimiters(text: string): string {
+export function neutralizeDelimiters(text: string): string {
   return text.replace(DELIMITER_TAG, (_m, slash: string, name: string) => `<\\${slash}${name}>`);
 }
 

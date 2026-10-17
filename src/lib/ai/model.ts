@@ -18,6 +18,14 @@ export function isE2EMock(): boolean {
   );
 }
 
+// Lightest model first for /api/suggest (D-05). Mock mode is short-circuited
+// in the route, so there is no mock model here.
+export const SUGGEST_MODEL_IDS = ["gemini-3.5-flash-lite", "gemini-3.6-flash"] as const;
+
+export function getSuggestModels() {
+  return SUGGEST_MODEL_IDS.map((id) => google(id));
+}
+
 export async function getModels(prompt: string, currentCode?: string) {
   if (isE2EMock()) {
     // Dynamic import so production never loads ai/test.
