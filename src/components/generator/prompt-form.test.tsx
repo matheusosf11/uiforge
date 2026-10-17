@@ -135,4 +135,121 @@ describe("PromptForm", () => {
       for (const c of chips) expect((c as HTMLButtonElement).disabled).toBe(true);
     });
   });
+
+  describe("refine mode", () => {
+    const CHIPS = [
+      { id: "a", label: "Maior", prompt: "Aumente o botão" },
+      { id: "b", label: "Escuro", prompt: "Use tema escuro" },
+    ];
+
+    function RefineHarness({
+      onSubmit = vi.fn(),
+      chips,
+      isLoading = false,
+    }: {
+      onSubmit?: () => void;
+      chips: typeof CHIPS | null;
+      isLoading?: boolean;
+    }) {
+      const [value, setValue] = useState("");
+      return (
+        <PromptForm
+          value={value}
+          onChange={setValue}
+          onSubmit={onSubmit}
+          onStop={vi.fn()}
+          isLoading={isLoading}
+          mode="refine"
+          chips={chips}
+          sessionBar={<div data-testid="bar">barra</div>}
+        />
+      );
+    }
+
+    function pressable() {
+      return screen
+        .queryAllByRole("button")
+        .filter((b) => b.hasAttribute("aria-pressed"));
+    }
+
+    it("switches title, label, placeholder and button; Ctrl+Enter submits", async () => {
+      const user = userEvent.setup();
+      const onSubmit = vi.fn();
+      render(<RefineHarness chips={CHIPS} onSubmit={onSubmit} />);
+      expect(
+        screen.getByRole("heading", { name: "Refinar componente" }),
+      ).toBeTruthy();
+      const ta = screen.getByRole("textbox", { name: "Descreva a mudança" });
+      expect(ta.getAttribute("placeholder")).toBe(
+        "Descreva a mudança… (⌘/Ctrl+Enter para refinar)",
+      );
+      expect(screen.getByRole("button", { name: "Refinar" })).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Gerar" })).toBeNull();
+      await user.type(ta, "x{Control>}{Enter}{/Control}");
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+    });
+
+    it("chip click prefills and focuses without submitting", async () => {
+      const user = userEvent.setup();
+      const onSubmit = vi.fn();
+      render(<RefineHarness chips={CHIPS} onSubmit={onSubmit} />);
+      expect(
+        screen.getByRole("group", { name: "Sugestões de refinamento" }),
+      ).toBeTruthy();
+      expect(pressable()).toHaveLength(2);
+
+      const chip = screen.getByRole("button", {
+        name: "Maior: Aumente o botão",
+      });
+      expect(chip.getAttribute("title")).toBe("Aumente o botão");
+      await user.click(chip);
+      const ta = screen.getByRole("textbox", {
+        name: "Descreva a mudança",
+      }) as HTMLTextAreaElement;
+      expect(ta.value).toBe("Aumente o botão");
+      expect(document.activeElement).toBe(ta);
+      expect(ta.selectionStart).toBe(ta.value.length);
+      expect(chip.getAttribute("aria-pressed")).toBe("true");
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    it("disables chips while loading", () => {
+      render(<RefineHarness chips={CHIPS} isLoading />);
+      for (const c of pressable())
+        expect((c as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it("renders 4 skeleton chips with aria-busy when chips is null", () => {
+      const { container } = render(<RefineHarness chips={null} />);
+      const busy = container.querySelector('[aria-busy="true"]');
+      expect(busy).not.toBeNull();
+      expect(busy!.children).toHaveLength(4);
+      expect(busy!.textContent).toBe("");
+      expect(pressable()).toHaveLength(0);
+    });
+
+    it("renders the sessionBar slot above the title", () => {
+      render(<RefineHarness chips={CHIPS} />);
+      const bar = screen.getByTestId("bar");
+      const title = screen.getByRole("heading", { name: "Refinar componente" });
+      expect(
+        bar.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it("exposes the textarea through textareaRef", () => {
+      const ref = { current: null as HTMLTextAreaElement | null };
+      render(
+        <PromptForm
+          value=""
+          onChange={vi.fn()}
+          onSubmit={vi.fn()}
+          onStop={vi.fn()}
+          isLoading={false}
+          textareaRef={ref}
+        />,
+      );
+      expect(ref.current).toBe(screen.getByRole("textbox", { name: "Prompt" }));
+    });
+  });
 });
