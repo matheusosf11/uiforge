@@ -4,6 +4,18 @@
 
 UIForge is an AI-powered UI component generator (a focused "v0 lite"): the user describes a component in natural language and the app generates self-contained React + Tailwind code in real time (streaming) and renders it live in a secure sandboxed preview, with an editor and copy/download actions. It is a portfolio showcase project built by and for front-end engineers to demonstrate modern web and AI-integration skills to recruiters at large companies.
 
+## Current Milestone: v1.1 Refinamento Iterativo
+
+**Goal:** After generating a component, the user refines it with follow-up prompts that edit the current component instead of regenerating from scratch.
+
+**Target features:**
+- Refine-by-default after first generation, with a "Novo componente" reset
+- Model context = current code + instruction only (no prompt history, keeps free-tier token use low)
+- In-memory version history (undo to earlier versions; no persistence)
+- Visible turn list (mini-chat of session prompts)
+- Editable code view; refinement builds on user edits
+- Demo GIF linked from both READMEs
+
 ## Core Value
 
 A user types a prompt and gets working, previewable React + Tailwind component code streamed back and rendered live — the generate-to-preview loop must feel fast, polished, and reliable.
@@ -23,9 +35,10 @@ A user types a prompt and gets working, previewable React + Tailwind component c
 
 ### Active
 
-Next milestone not defined yet — run `/gsd-new-milestone`. Candidates surfaced during v1.0:
-
-- [ ] Iterative refinement: a follow-up prompt edits the current component instead of generating from scratch (users already try this)
+- [ ] Iterative refinement: after the first generation, a follow-up prompt edits the current component (current code + instruction sent to the model); "Novo componente" starts from scratch
+- [ ] In-memory version history within the session (go back to a previous version)
+- [ ] Visible list of turns (prompts sent in the session, mini-chat style)
+- [ ] Editable code: user edits in the code view and refinement uses the edited version
 - [ ] Demo GIF (`docs/demo.gif`) linked from both READMEs
 
 ### Out of Scope
@@ -86,4 +99,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-17 after v1.0 milestone*
+*Last updated: 2026-10-17 — milestone v1.1 started*
