@@ -206,10 +206,10 @@ See patterns above. Test examples to add:
 | A2 | ~3-3.5 chars/token for TSX; 32_768 cap is ample | Pitfall 2 | Low; cap is far below model max, can raise |
 | A3 | Next route handlers have no default JSON body limit | Body size | Low; bounded by Vercel 4.5 MB |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. Should `friendlyGenerateError` take a mode param or should the client choose phrase constants? Recommend `friendlyGenerateError(error, { mode, status })`-style or separate exported constants; keep existing 1-arg call sites working (default generate).
-2. How will the client recognize 413 (HTTP status vs body token)? Recommend both: status 413 and body `code_too_large`; Phase 6 maps via `generate-error.ts`.
+1. Should `friendlyGenerateError` take a mode param or should the client choose phrase constants? Recommend `friendlyGenerateError(error, { mode, status })`-style or separate exported constants; keep existing 1-arg call sites working (default generate). **RESOLVED:** `friendlyGenerateError(error, mode = "generate")` (plan 05-01).
+2. How will the client recognize 413 (HTTP status vs body token)? Recommend both: status 413 and body `code_too_large`; Phase 6 maps via `generate-error.ts`. **RESOLVED:** status 413 + body `code_too_large` (plan 05-02).
 
 ## Environment Availability
 
