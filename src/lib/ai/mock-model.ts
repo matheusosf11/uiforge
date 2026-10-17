@@ -27,6 +27,25 @@ export default function FixtureCard() {
 }
 `;
 
+// Deterministic refine output (D-14). The slot line is a valid JSX comment child;
+// it is swapped for a visible EditedSeen marker when currentCode has __edited__.
+const EDITED_SLOT = "{/*__EDITED_SLOT__*/}";
+export const REFINED_COMPONENT = `import React from "react";
+
+export default function FixtureCard() {
+  return (
+    <div className="mx-auto max-w-sm rounded-xl border border-slate-200 bg-white p-6 shadow-md">
+      <h2 className="text-xl font-semibold text-slate-900">FixtureCard</h2>
+      <p className="mt-2 text-sm text-slate-600">Refinado</p>
+      ${EDITED_SLOT}
+      <button className="mt-4 rounded-lg bg-indigo-600 px-4 py-2 text-white">
+        Acao
+      </button>
+    </div>
+  );
+}
+`;
+
 const ERROR_KEYWORD = "__e2e_error__";
 const CHUNK_SIZE = 40;
 const ID = "mock-text";
@@ -39,8 +58,16 @@ function chunkText(text: string): string[] {
   return out;
 }
 
-export function createE2EMockModel(prompt: string) {
-  const deltas = chunkText(FIXED_COMPONENT).map((delta) => ({
+export function createE2EMockModel(prompt: string, currentCode?: string) {
+  const text = currentCode
+    ? REFINED_COMPONENT.replace(
+        EDITED_SLOT,
+        currentCode.includes("__edited__")
+          ? '<p className="text-sm">EditedSeen</p>'
+          : EDITED_SLOT,
+      )
+    : FIXED_COMPONENT;
+  const deltas = chunkText(text).map((delta) => ({
     type: "text-delta" as const,
     id: ID,
     delta,

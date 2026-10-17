@@ -18,10 +18,10 @@ export function isE2EMock(): boolean {
   );
 }
 
-export async function getModels(prompt: string) {
+export async function getModels(prompt: string, currentCode?: string) {
   if (isE2EMock()) {
     // Dynamic import so production never loads ai/test.
-    return [(await import("./mock-model")).createE2EMockModel(prompt)];
+    return [(await import("./mock-model")).createE2EMockModel(prompt, currentCode)];
   }
   return MODEL_IDS.map((id) => google(id));
 }

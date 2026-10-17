@@ -1,6 +1,6 @@
 /// <reference types="vitest/globals" />
 import { MODEL_IDS, getModels, isE2EMock } from "./model";
-import { FIXED_COMPONENT, createE2EMockModel } from "./mock-model";
+import { FIXED_COMPONENT, REFINED_COMPONENT, createE2EMockModel } from "./mock-model";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -47,8 +47,8 @@ describe("getModels", () => {
   });
 });
 
-async function consume(prompt: string) {
-  const model = createE2EMockModel(prompt);
+async function consume(prompt: string, currentCode?: string) {
+  const model = createE2EMockModel(prompt, currentCode);
   const { stream } = await model.doStream({ prompt: [] } as never);
   const parts: Array<{ type: string; delta?: string }> = [];
   const reader = stream.getReader();
@@ -91,5 +91,56 @@ describe("FIXED_COMPONENT", () => {
     expect(FIXED_COMPONENT).toContain("export default function FixtureCard");
     expect(FIXED_COMPONENT).not.toMatch(/use(State|Effect|Ref|Memo)/);
     expect(FIXED_COMPONENT).toContain("className=");
+  });
+});
+
+async function textOf(prompt: string, currentCode?: string) {
+  const parts = await consume(prompt, currentCode);
+  return parts
+    .filter((p) => p.type === "text-delta")
+    .map((p) => p.delta)
+    .join("");
+}
+
+describe("mock model refine mode", () => {
+  it("streams REFINED_COMPONENT with Refinado when currentCode is given", async () => {
+    const text = await textOf("p", "const a=1");
+    expect(text).toContain("Refinado");
+    expect(text).toContain("export default");
+    expect(text).not.toContain("EditedSeen");
+    expect(REFINED_COMPONENT).toContain("Refinado");
+  });
+
+  it("includes EditedSeen when currentCode contains __edited__", async () => {
+    const text = await textOf("p", "x __edited__");
+    expect(text).toContain("Refinado");
+    expect(text).toContain("EditedSeen");
+  });
+
+  it("still fails mid-stream for __e2e_error__ in edit mode", async () => {
+    const parts = await consume("p __e2e_error__", "code");
+    const types = parts.map((p) => p.type);
+    expect(types.at(-1)).toBe("error");
+    expect(types).not.toContain("finish");
+  });
+
+  it("generate output is unchanged without currentCode", async () => {
+    expect(await textOf("p")).toBe(FIXED_COMPONENT);
+  });
+
+  it("getModels forwards currentCode to the mock", async () => {
+    vi.stubEnv("UIFORGE_E2E_MOCK", "1");
+    const ms = await getModels("p", "code");
+    expect(ms).toHaveLength(1);
+    const { stream } = await ms[0].doStream({ prompt: [] } as never);
+    const reader = stream.getReader();
+    let out = "";
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const v = value as { type: string; delta?: string };
+      if (v.type === "text-delta") out += v.delta;
+    }
+    expect(out).toContain("Refinado");
   });
 });
