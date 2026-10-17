@@ -4,6 +4,10 @@ export const RATE_LIMIT_MESSAGE =
   "Muitas tentativas. Espere um pouco e tente de novo.";
 export const GENERIC_ERROR_MESSAGE =
   "Falha ao gerar o componente. Tente novamente.";
+export const CODE_TOO_LARGE_MESSAGE =
+  "O componente ficou grande demais para refinar. Comece um Novo componente.";
+export const REFINE_ERROR_MESSAGE =
+  "Falha ao refinar o componente. Sua versão anterior foi mantida.";
 
 const RATE_LIMIT_PATTERN = /\b429\b|RESOURCE_EXHAUSTED|rate limit|quota/i;
 
@@ -18,6 +22,10 @@ export function isRateLimitError(error: unknown): boolean {
 }
 
 /** Maps any error to one of two fixed pt-BR phrases (never the raw message). */
-export function friendlyGenerateError(error: unknown): string {
-  return isRateLimitError(error) ? RATE_LIMIT_MESSAGE : GENERIC_ERROR_MESSAGE;
+export function friendlyGenerateError(
+  error: unknown,
+  mode: "generate" | "edit" = "generate",
+): string {
+  if (isRateLimitError(error)) return RATE_LIMIT_MESSAGE;
+  return mode === "edit" ? REFINE_ERROR_MESSAGE : GENERIC_ERROR_MESSAGE;
 }

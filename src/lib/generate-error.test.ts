@@ -3,6 +3,8 @@ import { APICallError } from "ai";
 import {
   friendlyGenerateError,
   isRateLimitError,
+  CODE_TOO_LARGE_MESSAGE,
+  REFINE_ERROR_MESSAGE,
   GENERIC_ERROR_MESSAGE,
   RATE_LIMIT_MESSAGE,
 } from "./generate-error";
@@ -45,5 +47,18 @@ describe("friendlyGenerateError", () => {
     const out = friendlyGenerateError(new Error("Invalid request: secret"));
     expect(out).toBe("Falha ao gerar o componente. Tente novamente.");
     expect(GENERIC_ERROR_MESSAGE).toBe(out);
+  });
+  it("modo edit: frase de refinamento sem vazar a mensagem", () => {
+    const out = friendlyGenerateError(new Error("secret"), "edit");
+    expect(out).toBe(REFINE_ERROR_MESSAGE);
+    expect(out).toBe("Falha ao refinar o componente. Sua versão anterior foi mantida.");
+  });
+  it("modo edit: rate limit mantem a frase de limite", () => {
+    expect(friendlyGenerateError(api429(), "edit")).toBe(RATE_LIMIT_MESSAGE);
+  });
+  it("expoe a frase de codigo grande", () => {
+    expect(CODE_TOO_LARGE_MESSAGE).toBe(
+      "O componente ficou grande demais para refinar. Comece um Novo componente.",
+    );
   });
 });
