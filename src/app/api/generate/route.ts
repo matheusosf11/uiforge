@@ -125,15 +125,25 @@ export async function POST(req: Request) {
           if (value.type === "finish") {
             // Privacy: only mode, model id and token counts (D-11).
             const u = (value as { totalUsage?: { inputTokens?: number; outputTokens?: number } }).totalUsage;
+            const finishReason = (value as { finishReason?: unknown }).finishReason;
             console.info(
               JSON.stringify({
                 evt: "generate_usage",
                 mode,
                 model: modelId,
+                finishReason: typeof finishReason === "string" ? finishReason : null,
                 inputTokens: u?.inputTokens ?? null,
                 outputTokens: u?.outputTokens ?? null,
               }),
             );
+            // A non-"stop" finish (length, content-filter/recitation, other)
+            // means the model cut the file short: fail the body like a
+            // mid-stream error instead of presenting truncated code as done.
+            if (typeof finishReason === "string" && finishReason !== "stop") {
+              cancelReader();
+              controller.error(new Error("generate_failed"));
+              return;
+            }
             continue;
           }
           if (value.type === "error" || value.type === "abort") {

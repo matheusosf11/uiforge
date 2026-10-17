@@ -382,6 +382,29 @@ describe("POST /api/generate", () => {
       info.mockRestore();
     });
 
+    it("finishReason diferente de stop falha o corpo (codigo truncado)", async () => {
+      const info = vi.spyOn(console, "info").mockImplementation(() => {});
+      for (const finishReason of ["length", "content-filter", "other"]) {
+        state.parts = [
+          { type: "text-delta", text: "<path d=\"M14" },
+          { type: "finish", finishReason },
+        ];
+        const res = await POST(req({ prompt: "x" }));
+        expect(res.status).toBe(200);
+        await expect(res.text()).rejects.toThrow("generate_failed");
+        expect(JSON.parse(String(info.mock.calls.at(-1)?.[0]))).toMatchObject({ finishReason });
+      }
+      info.mockRestore();
+    }, 1000);
+
+    it("finishReason stop termina normalmente", async () => {
+      const info = vi.spyOn(console, "info").mockImplementation(() => {});
+      state.parts = [{ type: "text-delta", text: "a" }, { type: "finish", finishReason: "stop" }];
+      const res = await POST(req({ prompt: "x" }));
+      expect(await res.text()).toBe("a");
+      info.mockRestore();
+    });
+
     it("finish sem totalUsage nao quebra", async () => {
       const info = vi.spyOn(console, "info").mockImplementation(() => {});
       state.parts = [{ type: "text-delta", text: "a" }, { type: "finish" }];
