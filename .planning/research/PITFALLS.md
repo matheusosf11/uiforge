@@ -1,307 +1,166 @@
-# Pitfalls Research
+# Domain Pitfalls: v1.1 Refinamento Iterativo
 
-**Domain:** AI-powered React/Tailwind UI component generator ("v0 lite" — streaming codegen + live sandboxed preview)
-**Researched:** 2026-10-15
-**Confidence:** HIGH (core facts verified against Vercel, Gemini, Sandpack, and Vercel AI SDK official docs; a few UX/prompting items are MEDIUM — experience-based)
+**Domain:** Adding iterative refinement, version history and editable code to an existing AI component generator (Next.js 15, AI SDK v7, Gemini free tier, sandboxed srcdoc preview)
+**Researched:** 2026-10-17
+**Basis:** Read of PROJECT.md, `src/app/api/generate/route.ts`, `src/lib/prompt-limits.ts`, plus general knowledge of LLM-editing and editor UX. No external sources were fetched, so everything below is MEDIUM confidence (code-grounded reasoning plus well-known patterns). Items marked (verify) need a quick check in the phase.
 
-> Scope note: This is a no-auth portfolio demo on Vercel Hobby using Google Gemini (free tier) + Vercel AI SDK v5 + `@codesandbox/sandpack-react`. Pitfalls below are ordered by how likely they are to break the core generate→preview loop that the project lives or dies on.
+Phase names below are suggestions: **P-API** (refine contract and prompt), **P-STATE** (history, turns, abort), **P-EDIT** (editable code), **P-UX** (a11y, polish), **P-DOCS** (GIF, READMEs).
 
 ## Critical Pitfalls
 
-### Pitfall 1: Rendering LLM output as "code" without stripping markdown fences / prose
-
-**What goes wrong:**
-Gemini loves to wrap code in ```` ```tsx ```` fences and add a preamble ("Here's your component:") or a trailing explanation. If you pipe the raw stream straight into the Sandpack editor, the file starts with ` ```tsx ` and ends with ` ``` `, which is a syntax error, so the preview shows a red error for every single generation. Worse, during streaming you see *partial* fences (` `` ` then ` ```ts ` then ` ```tsx `) and partial prose, so naive mid-stream cleanup flickers or corrupts the code.
-
-**Why it happens:**
-Developers test with one "clean" response, see it work, and assume the model always returns bare code. It doesn't — fencing, language tags, and commentary are the *default* chat behavior, and they vary run to run.
-
-**How to avoid:**
-- Treat extraction as a dedicated, tested step — not an afterthought. Strip a leading ```` ```lang ```` fence and a trailing ```` ``` ```` fence; if no fence exists, use the raw text.
-- Make extraction **streaming-safe and idempotent**: run the same normalizer on every accumulated chunk, and tolerate an unterminated trailing fence while streaming (only require the closing fence once `finish` fires).
-- Prompt the model hard to return *only* code (see Pitfall 3) — but still parse defensively, because prompts are not a guarantee.
-- Unit-test the extractor against fixtures: no fence, ```` ```tsx ````, ```` ```jsx ````, ```` ```react ````, leading prose, trailing prose, and a mid-stream partial fence.
-
-**Warning signs:**
-Preview errors on the first line (`Unexpected token`), backticks visible in the editor, flicker as tokens arrive, or "works sometimes" generations.
-
-**Phase to address:**
-The streaming + code-extraction phase (the phase that wires Gemini → stream → editor). This is foundational; everything downstream assumes clean code.
-
----
-
-### Pitfall 2: Live preview breaks because SSR tries to render Sandpack on the server
-
-**What goes wrong:**
-`@codesandbox/sandpack-react` is a browser-only, CSS-in-JS (stitches) component. Importing it into a Server Component (the App Router default) throws build/runtime errors like `createContext is not a function`, `Cannot read properties of null (reading 'useState')`, or `window is not defined`. The app either won't build or crashes the moment the preview mounts.
-
-**Why it happens:**
-Next.js 15 App Router renders on the server by default. Developers drop `<Sandpack />` into a page/component without marking it client-only, and it tries to prerender server-side.
-
-**How to avoid:**
-- Put Sandpack behind a `"use client"` wrapper component, and load that wrapper with `next/dynamic` + `{ ssr: false }` from *another client component* (`ssr: false` is not allowed in a Server Component).
-- Pin `@codesandbox/sandpack-react` to **>= 2.15.0**, which ships the required `"use client"` directive (older versions need a `patch-package` hack).
-- To avoid a flash of unstyled Sandpack, inject its CSS via `getSandpackCssText()` inside `useServerInsertedHTML` (official App Router SSR guide pattern).
-
-**Warning signs:**
-`createContext is not a function`, `window is not defined` at build time, hydration mismatch warnings, or a preview that works in `next dev` but white-screens on Vercel.
-
-**Phase to address:**
-The live-preview / Sandpack integration phase. Lock in the client-only wrapper pattern before layering features on top.
-
----
-
-### Pitfall 3: Generated component doesn't actually run in Sandpack (forbidden imports, no default export)
-
-**What goes wrong:**
-The model returns "valid React" that still won't render in the Sandpack `react`/`react-ts` template: it imports `framer-motion`, `lucide-react`, `@/components/ui/button`, `next/image`, or `react-icons` (none installed); it uses a named export instead of a `default export`; it references `fetch`/external APIs; or it emits multiple components without a clear entry. Preview = module-not-found error, defeating the whole demo.
-
-**Why it happens:**
-LLMs default to "real-world" code with popular libraries and project-relative imports. The Sandpack sandbox is a minimal, dependency-free environment; the model doesn't know that unless you tell it and/or enforce it.
-
-**How to avoid:**
-- Put the constraints in the **system prompt explicitly**: single self-contained component; **default export**; **only** `react` (+ hooks) may be imported; **no external UI/icon/animation libraries**; **Tailwind utility classes only** (no CSS files, no styled-components); inline SVG instead of icon packs; no data fetching.
-- Give the model a **one-shot example** of a correct, runnable component — few-shot beats instructions alone for format compliance.
-- Add a lightweight **validation/guard pass** on the extracted code: detect disallowed `import` statements and the absence of a default export; surface a friendly "couldn't produce a runnable component, try rephrasing" instead of a raw stack trace.
-- Optionally allow a curated dependency allow-list via Sandpack `customSetup.dependencies` if you *choose* to support (e.g.) `lucide-react` — but decide deliberately; don't let the model pick arbitrarily.
-
-**Warning signs:**
-Frequent `Module not found` / `Could not find module` in the preview, `default export` errors, or previews that only work for trivial prompts.
-
-**Phase to address:**
-The prompt-engineering phase (system prompt + few-shot) with a verification hook in the preview/validation phase.
-
----
-
-### Pitfall 4: Tailwind classes have no effect inside the preview iframe
-
-**What goes wrong:**
-The generated component is full of `className="bg-indigo-600 ..."` but the preview renders unstyled. Your host app's Tailwind build does **not** reach inside the Sandpack iframe — the iframe is an isolated bundler (Parcel) with its own HTML. Also, external `<link>`/`<script>` placed in a Sandpack `index.html` are *not* passed through by the bundler, so the usual "just add the CDN tag" doesn't work.
-
-**Why it happens:**
-Developers assume Tailwind is global. In Sandpack, the preview is a separate runtime; it needs Tailwind injected into the iframe head specifically.
-
-**How to avoid:**
-- Inject Tailwind into the iframe via Sandpack's `options.externalResources`, e.g. `externalResources: ["https://cdn.tailwindcss.com"]` (Play CDN). This bypasses the bundler and lands in the iframe `<head>`.
-- Know the tradeoff: the **Tailwind Play CDN is dev-only** and depends on a third-party network fetch at preview time (adds latency; offline = broken; also a tiny JIT compile cost in-iframe). For a portfolio demo that's acceptable; document it as a known limitation.
-- Keep host-app Tailwind and preview Tailwind conceptually separate — don't expect your `tailwind.config` theme to apply inside the preview.
-
-**Warning signs:**
-Preview shows raw, unstyled HTML; styles work in your app's own UI but not inside the preview; classes like `sm:`/`dark:` do nothing in preview.
-
-**Phase to address:**
-The live-preview / Sandpack integration phase, alongside Pitfall 2.
-
----
-
-### Pitfall 5: Streaming works locally but gets cut off / times out on Vercel
-
-**What goes wrong:**
-In `next dev` streaming is flawless; on Vercel, long generations get chopped mid-stream, the UI shows `Connection closed`, or logs show `FUNCTION_INVOCATION_TIMEOUT` (504). Also an Edge-runtime route must send its first byte within ~25s or streaming capability is lost.
-
-**Why it happens:**
-Each serverless function invocation has a max duration. Fluid Compute now defaults to 300s on all plans (including Hobby), which is generous — but if you set a *lower* `maxDuration`, or buffer the whole response instead of streaming, you can still hit the ceiling or starve the connection. Node vs Edge runtime behavior also differs.
-
-**How to avoid:**
-- Actually **stream** — return `result.toUIMessageStreamResponse()` (or `toTextStreamResponse()`) from `streamText`; don't `await` the full text and return it in one shot.
-- Set an explicit route segment config, e.g. `export const maxDuration = 60;` (Hobby allows up to 300; values above 300 require Pro/Enterprise and will be rejected on Hobby).
-- Start sending data promptly (the model's first tokens count as "response started"); avoid heavy pre-stream work.
-- Prefer the Node.js runtime for the AI route unless you have a specific reason for Edge; if on Edge, remember the 25s first-byte rule.
-
-**Warning signs:**
-`Connection closed`, truncated code only on production, 504s in Vercel logs, long "thinking" with nothing streamed yet.
-
-**Phase to address:**
-The streaming phase (route handler config) and again at the deployment/CI phase (verify on a real Vercel URL, not just local).
-
----
-
-### Pitfall 6: Executing untrusted generated code without a real sandbox boundary
-
-**What goes wrong:**
-The whole premise is running model-generated (i.e., untrusted) code. If that code ever executes in the host page's context — e.g., via `eval`, `new Function`, `dangerouslySetInnerHTML`, or a non-sandboxed iframe — generated code could read the DOM, hit your origin's cookies/storage, exfiltrate the API key path, or XSS your portfolio. Sandpack mitigates this *only if* used as intended (isolated iframe).
-
-**Why it happens:**
-Under time pressure people "temporarily" render code with `eval`/`Function` to get a preview faster, intending to swap in Sandpack later — and it ships.
-
-**How to avoid:**
-- **Never** evaluate generated code in the host context. Always render through Sandpack's iframe (which runs the bundle in an isolated frame).
-- Keep the Gemini API key strictly **server-side** (route handler reads `process.env.GOOGLE_GENERATIVE_AI_API_KEY`); never expose it to the client or put it in a `NEXT_PUBLIC_` var. Generated code must never be able to reach the key.
-- Rely on the iframe `sandbox` isolation; don't poke holes (e.g., don't give the preview same-origin + allow-scripts in a way that reaches your app).
-- Treat *displayed* code as data too: when you echo generated code in your own (non-Sandpack) UI, render it as text in a `<pre>`/syntax highlighter, never as HTML.
-
-**Warning signs:**
-Any `eval(`, `new Function(`, or `dangerouslySetInnerHTML` touching model output; API key visible in client bundle/network tab; preview rendered inline instead of in an iframe.
-
-**Phase to address:**
-The live-preview phase (architecture decision) and a dedicated security review before deploy.
-
----
-
-### Pitfall 7: Gemini free-tier rate/quota limits with no graceful handling
-
-**What goes wrong:**
-Gemini free tier is tight: `gemini-2.5-flash` ≈ **10 RPM / 250k TPM / 250 RPD**; `gemini-2.5-flash-lite` ≈ 15 RPM / 1,000 RPD; `gemini-2.0-flash` ≈ 15 RPM. A public portfolio link shared with recruiters (or a demo click-spam) blows past 10 RPM fast and returns **429**. Without handling, the UI just spins or shows a cryptic error — the exact worst impression during an interview.
-
-**Why it happens:**
-Developers test alone (well under limits) and never see 429. Free-tier numbers also shift and are now surfaced per-project in Google AI Studio rather than a fixed published table.
-
-**How to avoid:**
-- Handle **429 explicitly** with a friendly, specific message ("High demand right now — try again in a moment") and, ideally, a short client-side backoff/disable-submit.
-- Pick the model deliberately: `gemini-2.5-flash-lite` or `gemini-2.0-flash` give more headroom (15 RPM, higher RPD) than `2.5-flash` if quality is acceptable; document the choice.
-- Guard the request path: disable the submit button while a generation is in flight (prevents accidental RPM burn from double-clicks) and consider a tiny debounce.
-- Keep the Groq fallback documented (PROJECT.md notes it) so the demo can switch providers if Gemini quota is exhausted on a big day.
-- Verify current limits in Google AI Studio before relying on any number here — they change.
-
-**Warning signs:**
-`429`, `RESOURCE_EXHAUSTED`, generations failing only when multiple people use the link, daily failures after ~250 requests.
-
-**Phase to address:**
-The AI integration phase (error taxonomy + model choice) and the error-states/UX phase (friendly messaging).
-
----
-
-### Pitfall 8: Hydration mismatch from theme (light/dark) + client-only widgets
-
-**What goes wrong:**
-Light/dark theming read from `localStorage`/`prefers-color-scheme` on the client produces different markup than the server render → React hydration mismatch warnings, a flash of the wrong theme (FOUC), and occasionally a broken first paint around the Sandpack wrapper.
-
-**Why it happens:**
-The server can't know the user's stored theme, so naive theme logic renders light on the server and dark on the client (or vice versa). Combined with `ssr: false` Sandpack, timing gets subtle.
-
-**How to avoid:**
-- Use an established approach: `next-themes` with `suppressHydrationWarning` on `<html>`, or a tiny inline pre-hydration script that sets the class before React mounts.
-- Keep the Sandpack subtree client-only (already required by Pitfall 2) so theme-dependent preview chrome doesn't fight hydration.
-- Gate any `window`/`localStorage` reads behind `useEffect`.
-
-**Warning signs:**
-`Hydration failed because the server rendered HTML didn't match the client`, a visible theme flash on load, console warnings on every refresh.
-
-**Phase to address:**
-The UI/theming phase (and reconfirmed in the polish/accessibility phase).
-
----
-
-## Technical Debt Patterns
-
-Shortcuts that seem reasonable but create long-term problems.
-
-| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
-|----------|-------------------|----------------|-----------------|
-| Regex-only "grab everything between first and last fence" extractor | Fast to write | Breaks on no-fence output, nested backticks, mid-stream partials; silent corruption | MVP only, *with* unit-test fixtures (Pitfall 1) |
-| Rendering preview via `eval`/`new Function` "for now" | Instant preview without wiring Sandpack | Security hole; near-impossible to retrofit safely; defeats the demo's selling point | **Never** |
-| Hardcoding model name as a string literal in several files | Quick | Switching to flash-lite or the Groq fallback becomes a find-replace hunt | Acceptable if centralized in one config/env |
-| Letting the model import any library and adding deps reactively | Fewer "module not found" today | Unbounded sandbox deps, slow/broken previews, unpredictable quality | Acceptable only with an explicit curated allow-list |
-| Skipping the `maxDuration` export (rely on defaults) | Less config | Surprise truncation if defaults change or you move to Edge | Acceptable short-term; set it before deploy (Pitfall 5) |
-| Tailwind Play CDN in the preview | Zero build setup, works instantly | Dev-only tool, network-dependent, not production-grade | Acceptable for a portfolio demo — document it |
-
-## Integration Gotchas
-
-Common mistakes when connecting to external services.
-
-| Integration | Common Mistake | Correct Approach |
-|-------------|----------------|------------------|
-| Vercel AI SDK v5 (`streamText`) | Returning `await result.text` (buffers whole response) or using removed v4 helpers | Return `result.toUIMessageStreamResponse()` / `toTextStreamResponse()`; use `@ai-sdk/google` + `google('gemini-2.5-flash')` |
-| Google Gemini key | Prefixing with `NEXT_PUBLIC_` or using it client-side | Server-only `GOOGLE_GENERATIVE_AI_API_KEY`; read in the route handler; add to Vercel env vars (not just `.env.local`) |
-| Sandpack + Next 15 App Router | Importing `<Sandpack/>` in a Server Component | `"use client"` wrapper + `dynamic(..., { ssr: false })`; Sandpack >= 2.15.0 |
-| Sandpack + Tailwind | Adding CDN `<script>` in `index.html` and expecting it to load | Use `options.externalResources: ["https://cdn.tailwindcss.com"]` (bundler strips index.html external tags) |
-| Vercel deploy | Forgetting to set env vars in the Vercel dashboard | Configure `GOOGLE_GENERATIVE_AI_API_KEY` in Project Settings → Environment Variables for Production/Preview |
-| Edge vs Node runtime | Choosing Edge for the AI route then hitting the 25s first-byte rule / lib incompatibility | Default to Node runtime for the AI route unless Edge is specifically required |
-
-## Performance Traps
-
-Patterns that work at small scale but fail as usage grows.
-
-| Trap | Symptoms | Prevention | When It Breaks |
-|------|----------|------------|----------------|
-| Re-mounting Sandpack / rebuilding the bundle on every streamed token | Preview flickers, CPU spikes, janky stream | Stream into the *editor* text; only (re)build the preview on stream `finish` (or debounced), not per chunk | Immediately, on any non-trivial component |
-| No concurrency guard on submit | Multiple in-flight calls burn the 10 RPM budget → 429 | Disable submit while streaming; debounce example-prompt clicks | As soon as more than one user, or a double-click |
-| Full React re-render of a huge code string each token | Typing/stream lag as code grows | Append to an accumulator and throttle editor state updates | Long components (a few hundred lines) |
-| Tailwind Play CDN JIT compiling in-iframe on every preview | Slight delay before styles appear, network dependency | Accept for demo; or precompile a static Tailwind CSS for the iframe if you need speed | Noticeable under slow network / many previews |
-| Relying on free-tier RPD (250) for a public link | Demo "dies" later in the day with 429s | Use higher-RPD model (flash-lite) + friendly error + Groq fallback | After ~250 requests/day on 2.5-flash |
-
-## Security Mistakes
-
-Domain-specific security issues beyond general web security.
-
-| Mistake | Risk | Prevention |
-|---------|------|------------|
-| Running generated code in the host page (`eval`/`Function`/inline) | Arbitrary code execution, DOM/cookie/key access, XSS on your portfolio | Execute only inside the Sandpack iframe; never in host context |
-| Exposing the Gemini API key to the client | Key theft, quota abuse, surprise bill if upgraded to paid | Server-only env var; key never leaves the route handler |
-| Rendering generated code as HTML in your own UI | Stored/reflected XSS via model output | Render code as *text* (syntax highlighter / `<pre>`), never `dangerouslySetInnerHTML` |
-| No input length / size cap on prompts | Token/quota abuse, oversized requests, cost/timeout risk | Cap prompt length client+server; reject empty/oversized input |
-| Trusting that "Sandpack is sandboxed" without checking iframe sandbox attrs | Weakened isolation if same-origin + allow-scripts is misconfigured | Keep default Sandpack isolation; don't grant the preview access to the host origin |
-| Open, unauthenticated, un-throttled public endpoint | Anyone can drain your free quota or rack up cost if later on paid tier | Accept for a demo, but add basic client guards; document that no server rate-limiting exists (out of scope per PROJECT.md) |
-
-## UX Pitfalls
-
-Common user experience mistakes in this domain.
-
-| Pitfall | User Impact | Better Approach |
-|---------|-------------|-----------------|
-| No loading/streaming affordance | User thinks it's frozen during model latency | Show streaming tokens live + a visible "generating…" state; stream *into view* immediately |
-| Raw error stack / blank preview on failure | Looks broken, kills recruiter impression | Friendly, specific error states (429, timeout, invalid-code) with a retry and an example prompt |
-| Empty first screen with no guidance | User doesn't know what to type | Example-prompt gallery to seed generation (already a requirement) — make it one-click |
-| Preview error shown with no code visibility | User can't tell if gen failed or code is wrong | Always show the (cleaned) code even when the preview errors, so the artifact is still usable/copyable |
-| Copy/download that silently fails or copies fenced text | User pastes broken code elsewhere | Copy the *cleaned* code; confirm with a toast; download with a sensible `.tsx` filename |
-| No focus management / keyboard support / aria on states | Inaccessible; fails the "polished" bar you're demonstrating | Manage focus on results, label controls, announce loading/error via `aria-live`, ensure responsive layout |
-
-## "Looks Done But Isn't" Checklist
-
-Things that appear complete but are missing critical pieces.
-
-- [ ] **Code extraction:** Often missing partial-fence / no-fence handling — verify against fixtures incl. mid-stream chunks and prose-wrapped output.
-- [ ] **Sandpack preview:** Often missing the `ssr:false` client-only wrapper — verify it builds and renders on a real Vercel deploy, not just `next dev`.
-- [ ] **Tailwind in preview:** Often missing `externalResources` — verify utility classes actually style the iframe, including `sm:`/`dark:` variants.
-- [ ] **Streaming on Vercel:** Often missing `maxDuration` + true streaming — verify a long generation doesn't truncate on production.
-- [ ] **Rate limits:** Often missing 429 handling — verify the UI degrades gracefully when quota is hit (simulate by spamming).
-- [ ] **API key:** Often missing in Vercel env (only in local `.env.local`) — verify production reads the key and it's not in the client bundle.
-- [ ] **Generated-code validity:** Often missing default-export/forbidden-import guard — verify a broad set of prompts produce runnable components, not just the demo prompt.
-- [ ] **Theme/hydration:** Often missing `suppressHydrationWarning`/pre-hydration script — verify no hydration warnings and no theme flash.
-- [ ] **Accessibility:** Often missing `aria-live` on loading/error + focus management — verify keyboard-only and screen-reader flows.
-- [ ] **Error-first testing:** Often only the happy path is tested — verify empty prompt, oversized prompt, model 429, and invalid-code preview all behave.
-
-## Recovery Strategies
-
-When pitfalls occur despite prevention, how to recover.
-
-| Pitfall | Recovery Cost | Recovery Steps |
-|---------|---------------|----------------|
-| Fenced/partial code shown in editor | LOW | Add/fix the normalizer + fixtures; re-run across sample prompts |
-| Sandpack SSR crash | LOW–MEDIUM | Wrap in `"use client"` + `dynamic(ssr:false)`; bump to >= 2.15.0; add `getSandpackCssText` injection |
-| Tailwind unstyled in preview | LOW | Add `options.externalResources: ["https://cdn.tailwindcss.com"]` |
-| Streaming truncated on Vercel | LOW | Set `export const maxDuration`, ensure you return the stream response, pick Node runtime |
-| `eval`-based preview shipped | HIGH | Re-architect preview onto Sandpack iframe; audit for key/DOM exposure; security review |
-| 429 storms during a demo | MEDIUM | Switch model to flash-lite / Groq fallback; add backoff + submit lock; add friendly messaging |
-| Model emits unrunnable code (bad imports) | MEDIUM | Strengthen system prompt + few-shot; add import/default-export guard with user-friendly fallback |
-| Hydration/theme flash | LOW | Adopt `next-themes` + `suppressHydrationWarning` or inline pre-hydration script |
-
-## Pitfall-to-Phase Mapping
-
-How roadmap phases should address these pitfalls.
-
-| Pitfall | Prevention Phase | Verification |
-|---------|------------------|--------------|
-| Markdown-fence / partial-token extraction (P1) | Streaming + code-extraction phase | Unit tests pass on fence/no-fence/prose/partial fixtures |
-| Sandpack SSR crash (P2) | Live-preview integration phase | Builds + renders on a real Vercel deploy; no `createContext`/`window` errors |
-| Unrunnable generated code (P3) | Prompt-engineering phase (+ validation hook) | Broad prompt set yields runnable, default-exported, dependency-free components |
-| Tailwind not applied in iframe (P4) | Live-preview integration phase | Utility classes incl. `sm:`/`dark:` style the preview |
-| Streaming truncation/timeout on Vercel (P5) | Streaming phase (+ deploy/CI phase) | Long generation streams fully on production; no 504/`Connection closed` |
-| Untrusted code execution + key exposure (P6) | Live-preview phase (+ security review) | No `eval`/inline exec; key absent from client bundle; preview is iframe-isolated |
-| Gemini free-tier rate limits (P7) | AI integration + error-states/UX phase | Simulated 429 shows friendly recoverable state; model/RPD choice documented |
-| Hydration/theme flash (P8) | UI/theming phase (+ polish/a11y phase) | No hydration warnings; no theme FOUC; a11y states announced |
+### 1. Model rewrites or truncates the component instead of editing it
+**What goes wrong:** The model returns a partial snippet ("// ...rest unchanged"), drops existing parts, renames things, or restyles unrelated areas. The preview then breaks or silently loses features.
+**Why it happens:** The v1.0 SYSTEM_PROMPT is for generation from scratch. Models love diffs and ellipses when given existing code.
+**Prevention:**
+- Add a separate refine system prompt (or mode block): "Return the COMPLETE updated component, same format as before. Never use placeholders or elisions. Change only what the instruction asks. Preserve everything else."
+- Validate server or client side before accepting a result as a new version: it contains `export default`, no `...rest`/`unchanged` placeholder markers, balanced fences, and is not drastically shorter than the input (for example under 40% of the length, unless the instruction asks to remove things).
+- Strip markdown fences in the same way as v1.0.
+- Add a mock-model e2e case for refine so CI covers the path (the existing env-gated mock needs to know about refine).
+**Detection:** After refinement the preview loses sections; output length much smaller than input; a literal "unchanged" in the code.
+**Phase:** P-API.
+
+### 2. Prompt length limit collides with code size
+**What goes wrong:** `Body` allows only `prompt` up to MAX_PROMPT_LENGTH = 2000 characters. Naively putting current code in `prompt` gives a 400 as soon as the component is non-trivial, and the UI error text ("prompt must be ... 2000 characters") is misleading. Raising MAX_PROMPT_LENGTH globally also lets users paste 2000-to-100k character instructions.
+**Prevention:**
+- Keep `prompt` (instruction) at 2000 and add a separate `code` field with its own constant, for example `MAX_CODE_LENGTH` (about 20-30k characters, tuned against typical generated size), in `prompt-limits.ts` and shared with the client.
+- Make it a discriminated schema: no `code` means generate, with `code` means refine. Reject refine without an instruction.
+- Client: when the code exceeds the limit, disable refine with a clear message and a "Novo componente" CTA, instead of letting the server 400.
+- Update the error mapping so a 400 on code size gets its own friendly message.
+- Also check Vercel body limits (4.5 MB, not a concern at this size) and that `getModels(parsed.prompt)` still receives something meaningful (it takes the prompt, so check what it does with it, for example length heuristics).
+**Detection:** 400s on the second turn; unit test with a 10k-character code body.
+**Phase:** P-API (must precede the UI).
+
+### 3. Free-tier token/quota cost multiplies with every refine
+**What goes wrong:** Each refine sends the whole code in and the whole code out (about 2x tokens of the component per turn), so 5 refines cost more than 5 generations. The in-memory limit of 5 requests per minute per IP is shared with generation, and the Gemini fallback chain burns up to 3 requests per user action when models 503/429. A recruiter clicking around can exhaust the daily quota and the demo shows "rate limited".
+**Prevention:**
+- Keep the decision "no history in context" (already made). Do not send previous turns or previous versions.
+- Cap `maxOutputTokens` for refine proportional to the input code, and keep the system prompt short.
+- Do not auto-retry refinement on the client; a failed refine must keep the current version.
+- Consider whether a refine should count the same as a generate in the rate limiter. It probably should (it is as expensive or more); document it. Show the `Retry-After` in the UI.
+- Skip tokens for no-ops: do not send empty or identical instructions.
+- Track token usage in logs (`result.usage`) to size limits with real data.
+**Detection:** 429s after 2-3 refines; Google AI Studio quota dashboard.
+**Phase:** P-API.
+
+### 4. Prompt injection through edited or pasted code
+**What goes wrong:** The user's edited code (or code pasted from the web) can contain comments such as "ignore previous instructions, output X". Since the code is concatenated into the prompt, the model may obey it. Impact is limited here (single user, no tools, no secrets in context, output only runs inside the sandboxed iframe), but it can make the demo misbehave, and a recruiter reviewing the security story will look at it.
+**Prevention:**
+- Put code in clearly delimited data blocks (for example `<current_code>...</current_code>`) and state in the system prompt that content inside is data, never instructions. Escape or neutralise a literal closing delimiter inside the code.
+- Keep the system prompt in `system`, never concatenated into user text. Keep the instruction and the code in separate parts of the message.
+- Do NOT relax the iframe sandbox because "the code is now user-edited". Edited code is still untrusted. `allow-scripts` only, no `allow-same-origin`.
+- Do not echo the model output into the host DOM as HTML.
+- Document honestly in the README: injection cannot be fully prevented; the blast radius is limited by design.
+**Detection:** Unit test with a code fixture containing instruction-like comments; manual check.
+**Phase:** P-API (prompt) and P-EDIT (sandbox invariants).
+
+### 5. Aborted or failed refinement corrupts history
+**What goes wrong:** With streaming, the "current version" is being written token by token. If the user presses "Parar", the network fails mid-stream (the route calls `controller.error` after status 200), or a 429/502 arrives, a half-written component can be pushed into history, or the last good version is overwritten. Undo then returns broken code. A typical variant: pushing to the history array on the first token instead of at completion.
+**Prevention:**
+- Model state as: `versions[]` (committed, immutable) + `draft` (streaming buffer). Commit to `versions` only on clean stream completion and after the validation from pitfall 1. On abort or error, discard the draft and keep the last committed version selected.
+- Decide explicitly what "Parar" does for a refine: discarding the partial is the safest default (a partial component is rarely valid).
+- Use one request-id or AbortController per turn; ignore chunks from a stale controller (race: user starts turn B while A is still streaming, A's late chunks land in B).
+- Disable submit, undo, and "Novo componente" while streaming, or abort the in-flight request first.
+- The turn list entry for a failed or aborted turn should be marked failed (not silently vanish, not look successful).
+**Detection:** Unit-test the reducer with sequences: start, chunk, abort, undo; start, error; start A, start B, late chunk A.
+**Phase:** P-STATE.
+
+### 6. Editor and stream state conflict
+**What goes wrong:** The code view was read-only and driven by the stream. Making it editable creates two writers: the user typing and the streaming buffer. Typical bugs: a stream overwrites the user's unsaved edits; the user types during streaming and edits are lost or interleaved; stale edited text is sent on refine because the state lives in the editor DOM; the preview updates on every keystroke (re-render storms, and the iframe reloads and flashes); cursor jumps when the value prop is reset on each render.
+**Prevention:**
+- Single source of truth: `currentCode` in state, with an explicit `source` (`model` | `user`). Make the editor read-only while streaming (with `aria-readonly` and a visible hint), and editable only when idle.
+- Refine sends `currentCode` (including user edits). Treat a user edit as a new draft that becomes a version either on blur or on refine submit (decision needed: "edited" version labelled in history, so undo can go back to the pre-edit model output).
+- Debounce preview updates from edits (about 300-500 ms), and keep the iframe update path the same as for streaming (see pitfall 7).
+- Controlled editor: do not re-set the value when it already equals state; avoid resetting selection.
+- Undo semantic clash: browser/editor Ctrl+Z (character undo) vs the app's version undo. Use a visibly different control and do not bind Ctrl+Z globally.
+**Detection:** Type during streaming; refine after editing and check that the request body contains the edit; undo after edit.
+**Phase:** P-EDIT (after P-STATE).
+
+### 7. Streaming over the previous version flashes or blanks the preview
+**What goes wrong:** On refine, the new code streams in and is fed to the preview on each chunk. Partial code does not compile, so the iframe shows errors or blank, replacing a perfectly good previous preview. Re-assigning `srcdoc` on every chunk reloads the iframe (flash, losing runtime state) and, with the self-hosted runtime plus the 15 s load watchdog, can trigger the "failed to load" path spuriously.
+**Prevention:**
+- Keep showing the last committed version in the preview while the refine streams; stream into the code view only (or into a "draft" tab). Swap the preview once, at commit (clean completion + validation). Show a subtle "atualizando" overlay, not a blank.
+- Do not recreate the iframe per version; post a message to update the code, or at least change srcdoc only on commit. Check how v1.0 handles first-generation partials and reuse that logic (verify).
+- Reset/re-arm the watchdog per swap so it does not fire against a stale load.
+- Respect `prefers-reduced-motion` on any crossfade.
+- If the new version fails to compile in the sandbox, keep the user on a visible error plus a one-click "voltar à versão anterior", rather than a dead preview.
+**Detection:** Record a refine in Playwright and screenshot mid-stream; assert the preview is non-empty throughout.
+**Phase:** P-STATE / P-API integration.
+
+## Moderate Pitfalls
+
+### 8. Unbounded or leaky in-memory history
+**What goes wrong:** Each version holds the full code (10-30 KB); 50 turns = about 1 MB: fine, but copies in React state on every keystroke edit can bloat, and the turn list and versions can drift out of sync (turn N must map to version N).
+**Prevention:** Cap versions (for example 20, dropping the oldest, with a visible note); store versions and turns in one structure (`{id, instruction, code, status, source}`) rather than two parallel arrays; use a reducer with unit tests. "Novo componente" must clear history, turns, abort in-flight, and reset the editor. After undo, decide: either a new refine truncates the "future" versions or branches; choose truncation (simplest) and test it.
+**Phase:** P-STATE.
+
+### 9. Undo semantics unclear
+**What goes wrong:** Users expect "undo" to also remove the turn, or to redo. Restoring a version then refining from it must send that version's code, not the latest.
+**Prevention:** Make "restore this version" explicit in the turn list (click a turn to view; "Restaurar" to make it current). Always derive the refine input from the selected version's code. Consider a minimal redo or none; state it in the UI.
+**Phase:** P-STATE.
+
+### 10. Refine-by-default confuses first-time users and the example gallery
+**What goes wrong:** After the first generation, clicking an example prompt from the gallery now refines the current component instead of generating a new one. The placeholder and submit button text stay "Gerar".
+**Prevention:** Change the label and placeholder to refine mode ("Descreva a mudança..."); the gallery either hides, or starts a new component explicitly; "Novo componente" is prominent. Unit test the mode switch.
+**Phase:** P-UX.
+
+### 11. Server route changes break existing behaviour
+**What goes wrong:** Touching `route.ts` (fallback chain, first-delta peeking, rate limit, mock) regresses v1.0: for example `getModels(prompt)` or the e2e mock keying on the prompt content, and the 93 unit tests assuming the old body shape.
+**Prevention:** Keep generate bodies backward compatible (no `code`). Extract message building into a pure function (`buildMessages({prompt, code})`) with tests. Note the working tree already has uncommitted changes in `route.ts`, `prompt.ts`, `.env.example`, `vitest.setup.ts`, and `theme-provider.tsx`; commit or reconcile before starting so the diff is reviewable.
+**Phase:** P-API.
+
+### 12. Code editor bundle size
+**What goes wrong:** Monaco (several MB) or CodeMirror with many language packs inflates the first-load JS, damaging the Lighthouse/performance story, and Monaco worker setup on Next/Vercel is fiddly. Sandpack was already removed for similar reasons.
+**Prevention:** Prefer a light option: a plain `<textarea>` with line-height-synced highlight overlay, or CodeMirror 6 with only the JS/JSX language and minimal extensions, loaded via `next/dynamic` (`ssr: false`) only when the user enters edit mode. Measure with `next build` output / bundle analyzer and set a budget (for example under 150 KB gzipped added). Avoid Monaco. (verify chosen library's current size and React 19 compatibility.)
+**Phase:** P-EDIT (decision up front).
+
+### 13. Editor and turn list accessibility
+**What goes wrong:** Code editors are keyboard traps (Tab inserts a tab character); screen readers get no label; streaming text announced token by token; the turn list is a bare div; focus is lost after undo/restore or "Novo componente".
+**Prevention:**
+- Editor: an accessible name (`aria-label`), a documented Escape-then-Tab escape hatch, or no tab capture by default; sufficient contrast in both themes (the preview is always light, the editor follows the theme).
+- Streaming status in a single `aria-live="polite"` region with short messages ("Gerando...", "Pronto"), not the code itself.
+- Turn list: a semantic `<ol>`, current version `aria-current="true"`, restore buttons with descriptive labels ("Restaurar versão 3: <instrução>"), visible focus rings, and truncated instructions with full text available.
+- Move focus deliberately after restore and reset (to the heading or input).
+- Run the axe checks already used in e2e (if any) on the refine state.
+**Phase:** P-UX with P-EDIT.
+
+### 14. Unsaved-edit loss on actions
+**What goes wrong:** "Novo componente", restore, or a failed refine silently discards user edits.
+**Prevention:** Treat the edited code as a version (pitfall 6) so nothing is lost; confirm only for destructive "Novo componente" when there is more than one version.
+**Phase:** P-EDIT.
+
+## Minor Pitfalls
+
+### 15. Demo GIF bloats the repo
+**What goes wrong:** A screen-recorded GIF is easily 5-30 MB, permanently in git history, slowing clones and breaking README load on mobile.
+**Prevention:** Target under 2-3 MB: 800-960 px wide, 10-12 fps, 15-25 s, palette-optimised (gifski or ffmpeg palettegen + gifsicle). Or link an MP4/WebM hosted outside git plus a small poster GIF; do not commit multiple iterations (history keeps every one; record once, final). Use a deterministic mock or a fast prompt to avoid recording flaky/slow streaming; use alt text in both READMEs (EN and PT) and a relative path `docs/demo.gif`. Check that the link works on GitHub rendering. Since git history cannot be shrunk cheaply, optimise before the first commit.
+**Phase:** P-DOCS (last).
+
+### 16. README claims drift
+**What goes wrong:** READMEs still say "each prompt is generated from scratch".
+**Prevention:** Update feature list, architecture notes, and the limits section in both languages in the same phase as the GIF.
+**Phase:** P-DOCS.
+
+### 17. Test gaps
+**What goes wrong:** Unit tests cover generation only; the refine path, undo, and abort are untested, and e2e with the mock model cannot show an "edit".
+**Prevention:** Extend the mock to return a deterministic modified component when `code` is present; e2e: generate, refine, undo, edit, refine-with-edit, abort mid-stream.
+**Phase:** every phase; final gate in P-UX.
+
+## Phase-Specific Warnings
+
+| Phase topic | Likely pitfall | Mitigation |
+|-------------|----------------|------------|
+| Refine API contract | #2 length limit, #11 regressions | Separate `code` field and limit; pure `buildMessages`; keep backward compatibility |
+| Refine prompt | #1 partial output, #4 injection | Full-component rule, delimiters, validation before commit |
+| Quota | #3 | Output cap, no client auto-retry, show Retry-After |
+| History/turn state | #5 abort corruption, #8, #9 | Reducer with draft vs committed versions; request-id guard |
+| Streaming into preview | #7 flash/blank | Preview swaps on commit only; reuse the iframe |
+| Editable code | #6 two writers, #12 bundle | Read-only while streaming; lazy light editor |
+| A11y/UX | #10, #13, #14 | Mode-aware labels, live region, semantic list, focus management |
+| Docs | #15 GIF size, #16 drift | Optimised single GIF under about 3 MB; update both READMEs |
+
+## Suggested ordering implication
+P-API (contract, prompt, limits, validation) first, then P-STATE (reducer, abort, preview swap), then P-EDIT (needs the state model to avoid pitfall 6), then P-UX/a11y polish, then P-DOCS (GIF last, after the UI stops changing). Deeper research flags: editor library choice (#12) and the preview update path (#7, verify how v1.0 feeds the iframe).
 
 ## Sources
-
-- Vercel Functions limits & max duration (Hobby 300s default/max; `FUNCTION_INVOCATION_TIMEOUT`; Edge 25s first-byte): https://vercel.com/docs/functions/limitations , https://vercel.com/docs/functions/configuring-functions/duration , https://vercel.com/changelog/higher-defaults-and-limits-for-vercel-functions-running-fluid-compute — HIGH
-- Vercel AI SDK v5: Gemini guide, Next.js App Router route handler, stream protocols, `streamText` reference, Vercel timeout troubleshooting (`maxDuration`): https://ai-sdk.dev/v5/cookbook/guides/gemini , https://ai-sdk.dev/v5/docs/getting-started/nextjs-app-router , https://ai-sdk.dev/v5/docs/ai-sdk-ui/stream-protocol , https://ai-sdk.dev/v5/docs/troubleshooting/timeout-on-vercel — HIGH
-- Google Gemini API rate limits (free-tier RPM/TPM/RPD; limits now surfaced in AI Studio and subject to change): https://ai.google.dev/gemini-api/docs/rate-limits , https://ai.google.dev/gemini-api/docs/pricing — HIGH (exact free-tier numbers MEDIUM: Google no longer publishes a fixed table; verify in AI Studio)
-- Sandpack SSR guide (App Router `"use client"`, `getSandpackCssText`, `useServerInsertedHTML`) + known issues (`createContext is not a function`, fix in 2.15.0): https://sandpack.codesandbox.io/docs/guides/ssr , https://github.com/codesandbox/sandpack/issues/1093 , https://github.com/codesandbox/sandpack/issues/1152 — HIGH
-- Next.js lazy loading / `ssr:false` only in Client Components: https://nextjs.org/docs/app/guides/lazy-loading — HIGH
-- Sandpack `externalResources` for Tailwind + bundler not passing index.html external tags: https://sandpack.vercel.app/docs/getting-started/usage , https://github.com/codesandbox/sandpack/pull/147 , https://github.com/codesandbox/sandpack/issues/624 — HIGH
-- Tailwind Play CDN (development-only): https://tailwindcss.com/docs/installation/play-cdn — HIGH
-- UX/prompting/accessibility pitfalls — practitioner experience with streaming LLM codegen apps ("v0 lite" category) — MEDIUM
-
----
-*Pitfalls research for: AI-powered React/Tailwind UI component generator (UIForge)*
-*Researched: 2026-10-15*
+- Project files: `.planning/PROJECT.md`, `src/app/api/generate/route.ts`, `src/lib/prompt-limits.ts` (HIGH for code facts).
+- General LLM code-editing, editor a11y, and GIF optimisation practice from training knowledge (MEDIUM/LOW; not re-verified online in this pass).
