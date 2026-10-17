@@ -314,6 +314,15 @@ describe("POST /api/generate", () => {
       await res.text();
     });
 
+    it.each([[undefined], ["code"]])(
+      "prompt so com espacos vira 400 (currentCode %j)",
+      async (code) => {
+        const res = await POST(req({ prompt: "  \n\t ", currentCode: code }));
+        expect(res.status).toBe(400);
+        expect(vi.mocked(streamText)).not.toHaveBeenCalled();
+      },
+    );
+
     it("prompt > 2000 com currentCode vira 400", async () => {
       const res = await POST(req({ prompt: "x".repeat(2001), currentCode: "code" }));
       expect(res.status).toBe(400);

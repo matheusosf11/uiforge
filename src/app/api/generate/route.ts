@@ -21,7 +21,10 @@ const MAX_BODY_BYTES = 256_000;
 // Whitespace-only/null/absent currentCode means generate mode (D-08); real
 // code keeps its original untrimmed text. No .max here: oversize is a 413.
 const Body = z.object({
-  prompt: z.string().min(1).max(MAX_PROMPT_LENGTH),
+  prompt: z
+    .string()
+    .max(MAX_PROMPT_LENGTH)
+    .refine((s) => s.trim().length > 0),
   currentCode: z
     .string()
     .nullish()
