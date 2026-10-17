@@ -57,8 +57,14 @@ export function buildSystem(mode: Mode): string {
  */
 export function buildUserPrompt(prompt: string, currentCode?: string): string {
   if (!currentCode) return prompt;
-  const safeCode = currentCode.replaceAll("</current_code>", "<\\/current_code>");
-  return `<current_code>\n${safeCode}\n</current_code>\n\n<instruction>\n${prompt}\n</instruction>`;
+  return `<current_code>\n${neutralizeDelimiters(currentCode)}\n</current_code>\n\n<instruction>\n${neutralizeDelimiters(prompt)}\n</instruction>`;
+}
+
+// Case-insensitive and whitespace-tolerant: <\/current_code>, <\instruction>.
+const DELIMITER_TAG = /<\s*(\/?)\s*(current_code|instruction)\s*>/gi;
+
+function neutralizeDelimiters(text: string): string {
+  return text.replace(DELIMITER_TAG, (_m, slash: string, name: string) => `<\\${slash}${name}>`);
 }
 
 export const SYSTEM_PROMPT: string = buildSystem("generate");
