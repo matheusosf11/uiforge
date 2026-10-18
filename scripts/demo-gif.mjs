@@ -11,7 +11,7 @@
 //      default 25), DEMO_GIF_FLOOR (RGB channel values below this are flattened
 //      to the page background, default 26; 0 disables it).
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, statSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
 
@@ -19,6 +19,9 @@ const MAX_BYTES = 3 * 1024 * 1024;
 const VIDEO = join("test-results", "demo", "demo.webm");
 const PALETTE = join("test-results", "demo", "palette.png");
 const OUTPUT = join("docs", "demo.gif");
+// Each ladder step renders here; OUTPUT is replaced only by a GIF within the
+// size cap, so a failed or oversized run never clobbers the committed asset.
+const TMP_GIF = join("test-results", "demo", "demo.tmp.gif");
 const START = String(Number(process.env.DEMO_GIF_START ?? 1.5));
 const SPEED = Number(process.env.DEMO_GIF_SPEED ?? 1.35);
 const MAX_LEN = Number(process.env.DEMO_GIF_MAX ?? 25);
@@ -96,16 +99,20 @@ for (const step of LADDER) {
   ffmpeg([
     "-y", ...trim, "-i", VIDEO, "-i", PALETTE,
     "-lavfi", `${base}[x];[x][1:v]paletteuse=dither=${step.dither}:diff_mode=rectangle`,
-    OUTPUT,
+    TMP_GIF,
   ]);
-  size = statSync(OUTPUT).size;
+  size = statSync(TMP_GIF).size;
   console.log(
     `demo.gif: ${(size / 1024 / 1024).toFixed(2)} MB (width ${step.width}, ${step.fps} fps, ${step.colors} colors, dither ${step.dither}, -ss ${START} -t ${INPUT_LEN}, speed ${SPEED}x, floor ${FLOOR})`,
   );
-  if (size <= MAX_BYTES) break;
+  if (size <= MAX_BYTES) {
+    copyFileSync(TMP_GIF, OUTPUT);
+    break;
+  }
 }
+rmSync(TMP_GIF, { force: true });
 
 if (size > MAX_BYTES) {
-  fail(`demo.gif is still over 3 MB at width ${used.width}, ${used.fps} fps; shorten the demo`);
+  fail(`demo.gif is still over 3 MB at width ${used.width}, ${used.fps} fps; shorten the demo (${OUTPUT} left unchanged)`);
 }
 console.log(`wrote ${OUTPUT}`);
