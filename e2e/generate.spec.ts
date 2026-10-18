@@ -56,6 +56,8 @@ test.describe("copy and download", () => {
     await expect(page.getByText("Pronto")).toBeVisible({ timeout: 15000 });
 
     await page.getByRole("button", { name: "Copiar" }).click();
+    // The write resolves after the click; wait for it before reading.
+    await expect(page.getByRole("button", { name: "Copiado" })).toBeVisible();
     const text = await page.evaluate(() => navigator.clipboard.readText());
     expect(text).toContain("export default function FixtureCard");
 
@@ -218,6 +220,8 @@ test.describe("edit smoke", () => {
     const original = await editor.inputValue();
     await editor.fill(`${original}\n// copiado-e2e`);
     await page.getByRole("button", { name: "Copiar" }).click();
+    // The write resolves after the click; wait for it before reading.
+    await expect(page.getByRole("button", { name: "Copiado" })).toBeVisible();
     const text = await page.evaluate(() => navigator.clipboard.readText());
     expect(text).toContain("copiado-e2e");
   });
