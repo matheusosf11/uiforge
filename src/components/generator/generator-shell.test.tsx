@@ -1115,6 +1115,20 @@ describe("draft commit before actions", () => {
     expect(screen.queryByText("Editado", { exact: true })).toBeNull();
   });
 
+  it("editor Ctrl+Z after discarding and typing does not bring the draft back (IN-01)", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await v1WithDraft(user);
+
+    await user.click(screen.getByRole("button", { name: "Descartar edições" }));
+    expect(editor()).toHaveValue(V1);
+    await typeAtEnd(user, "x");
+    expect(editor()).toHaveValue(V1 + "x");
+    fireEvent.keyDown(editor(), { key: "z", keyCode: 90, ctrlKey: true });
+    expect(editor()).toHaveValue(V1);
+    expect(screen.queryByText("Editado", { exact: true })).toBeNull();
+  });
+
   it("Ctrl+Z outside fields with a draft commits then undoes (D-07)", async () => {
     const user = userEvent.setup();
     render(<GeneratorShell />);

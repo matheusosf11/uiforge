@@ -153,6 +153,16 @@ export function GeneratorShell() {
     : committed
       ? `${committed.id}:${state.nextVersionId}:${state.cursor}`
       : null;
+  // IN-01: a discard also resets the editor history, so Ctrl+Z after
+  // discarding and typing never brings the discarded draft back. Kept out of
+  // versionKey so a discard does not trigger the scroll reset.
+  const [discards, setDiscards] = useState(0);
+  const historyKey = versionKey === null ? null : `${versionKey}:d${discards}`;
+
+  function handleDiscard() {
+    setDraft(null);
+    setDiscards((d) => d + 1);
+  }
 
   // Single source of the status text (D-16, D-20). D-15: a manual version
   // saved by the same action prefixes the follow-up (React batches the
@@ -470,8 +480,8 @@ export function GeneratorShell() {
             onChange={handleEditorChange}
             readOnly={busy || !committed}
             dirty={dirty}
-            onDiscard={() => setDraft(null)}
-            historyKey={versionKey}
+            onDiscard={handleDiscard}
+            historyKey={historyKey}
           />
         </div>
       </div>
