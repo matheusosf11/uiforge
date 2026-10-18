@@ -25,7 +25,7 @@ export type Pending = {
   text: string;
 };
 
-export type SessionNotice = "committed" | "undo" | "reset" | null;
+export type SessionNotice = "committed" | "undo" | "forward" | "reset" | null;
 
 export type SessionState = {
   versions: Version[];
@@ -34,6 +34,9 @@ export type SessionState = {
   error: SessionError | null;
   nextVersionId: number;
   notice: SessionNotice;
+  // Versions evicted by the MAX_VERSIONS cap; offsets display numbers so they
+  // stay stable (ids are internal and never shown).
+  droppedCount: number;
 };
 
 export type SessionAction =
@@ -46,6 +49,7 @@ export type SessionAction =
   | { type: "ABORT"; id: number }
   | { type: "REJECT"; kind: "too_large"; instruction: string }
   | { type: "UNDO" }
+  | { type: "RESTORE"; versionId: number }
   | { type: "RESET" };
 
 export const initialSessionState: SessionState = {
@@ -55,6 +59,7 @@ export const initialSessionState: SessionState = {
   error: null,
   nextVersionId: 1,
   notice: null,
+  droppedCount: 0,
 };
 
 export function committedVersion(state: SessionState): Version | null {
@@ -67,6 +72,39 @@ export function isBusy(state: SessionState): boolean {
 
 export function canUndo(state: SessionState): boolean {
   return state.pending === null && state.cursor > 0;
+}
+
+/** Stable 1-based display number for the version at `index`. */
+export function displayNumber(droppedCount: number, index: number): number {
+  return droppedCount + index + 1;
+}
+
+/** Display number of `state.versions[index]`. */
+export function versionNumber(state: SessionState, index: number): number {
+  return displayNumber(state.droppedCount, index);
+}
+
+/** Display number of the committed version, or null on an empty session. */
+export function currentNumber(state: SessionState): number | null {
+  return state.cursor < 0 ? null : versionNumber(state, state.cursor);
+}
+
+/** Display range of versions after the cursor (discarded on the next refine). */
+export function laterRange(
+  state: SessionState,
+): { from: number; to: number } | null {
+  if (state.cursor < 0 || state.cursor >= state.versions.length - 1) {
+    return null;
+  }
+  return {
+    from: versionNumber(state, state.cursor + 1),
+    to: versionNumber(state, state.versions.length - 1),
+  };
+}
+
+/** True once the cap has evicted at least one version. */
+export function hasDroppedVersions(state: SessionState): boolean {
+  return state.droppedCount > 0;
 }
 
 export function sessionReducer(
@@ -115,6 +153,20 @@ export function sessionReducer(
         pending.baseId === null
           ? -1
           : state.versions.findIndex((v) => v.id === pending.baseId);
+      // IN-01: the base is gone (e.g. evicted); keep history instead of
+      // treating the commit as a fresh generation that wipes it.
+      if (pending.baseId !== null && baseIndex === -1) {
+        return {
+          ...state,
+          pending: null,
+          error: {
+            kind: "failed",
+            instruction: pending.instruction,
+            baseId: pending.baseId,
+          },
+          notice: null,
+        };
+      }
       const kept = state.versions.slice(0, baseIndex + 1);
       const versions = [
         ...kept,
@@ -125,7 +177,11 @@ export function sessionReducer(
           source: "ai" as const,
         },
       ];
-      while (versions.length > MAX_VERSIONS) versions.shift();
+      let dropped = 0;
+      while (versions.length > MAX_VERSIONS) {
+        versions.shift();
+        dropped++;
+      }
       return {
         versions,
         cursor: versions.length - 1,
@@ -133,6 +189,7 @@ export function sessionReducer(
         error: null,
         nextVersionId: state.nextVersionId + 1,
         notice: "committed",
+        droppedCount: state.droppedCount + dropped,
       };
     }
     case "FAIL": {
@@ -169,6 +226,18 @@ export function sessionReducer(
       if (!canUndo(state)) return state;
       return { ...state, cursor: state.cursor - 1, error: null, notice: "undo" };
     }
+    case "RESTORE": {
+      // Later versions survive (implicit redo); truncation happens at COMMIT.
+      if (state.pending !== null) return state;
+      const index = state.versions.findIndex((v) => v.id === action.versionId);
+      if (index === -1 || index === state.cursor) return state;
+      return {
+        ...state,
+        cursor: index,
+        error: null,
+        notice: index < state.cursor ? "undo" : "forward",
+      };
+    }
     case "RESET": {
       return {
         versions: [],
@@ -177,6 +246,7 @@ export function sessionReducer(
         error: null,
         nextVersionId: state.nextVersionId,
         notice: "reset",
+        droppedCount: 0,
       };
     }
     default:
