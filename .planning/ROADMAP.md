@@ -24,7 +24,8 @@
 - [x] **Phase 7: Turn List & Version Navigation** - Accessible mini-chat list of turns that restores any version and shows the refine base (completed 2026-10-18)
 - [x] **Phase 8: Editable Code View** - Syntax-highlighted editable code that live-updates preview and feeds the next refinement
  (completed 2026-10-18)
-- [ ] **Phase 9: E2E, Demo GIF & Docs** - Full refine journey covered by e2e, recorded demo GIF, PT/EN READMEs updated
+- [x] **Phase 9: E2E, Demo GIF & Docs** - Full refine journey covered by e2e, recorded demo GIF, PT/EN READMEs updated
+ (completed 2026-10-18)
 
 ## Phase Details
 
@@ -111,7 +112,7 @@ Plans:
 Plans:
 - [x] 09-01-PLAN.md — Refine journey e2e (e2e/journey.spec.ts), isolated Playwright run on port 3200
 - [x] 09-02-PLAN.md — Demo spec + demo:gif script (ffmpeg palette), docs/demo.gif, dark-only screenshots
-- [ ] 09-03-PLAN.md — README.md / README.pt-BR.md for refine, history, editable code, API contract
+- [x] 09-03-PLAN.md — README.md / README.pt-BR.md for refine, history, editable code, API contract
 
 ## Progress
 
@@ -125,4 +126,4 @@ Plans:
 | 6. Session Core & Refine Loop | v1.1 | 7/7 | Complete    | 2026-10-18 |
 | 7. Turn List & Version Navigation | v1.1 | 5/5 | Complete    | 2026-10-18 |
 | 8. Editable Code View | v1.1 | 6/6 | Complete    | 2026-10-18 |
-| 9. E2E, Demo GIF & Docs | v1.1 | 2/3 | In Progress|  |
+| 9. E2E, Demo GIF & Docs | v1.1 | 3/3 | Complete   | 2026-10-18 |
