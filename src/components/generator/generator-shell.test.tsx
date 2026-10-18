@@ -14,13 +14,20 @@ vi.mock("next/dynamic", () => ({
     function PreviewStub({
       code,
       updating,
+      onRegenerate,
     }: {
       code: string;
       updating?: boolean;
+      onRegenerate?: () => void;
     }) {
       return (
         <div data-testid="preview" data-code={code}>
           {updating ? "Atualizando…" : null}
+          {onRegenerate ? (
+            <button type="button" onClick={onRegenerate}>
+              Preview: tentar de novo
+            </button>
+          ) : null}
         </div>
       );
     },
@@ -195,6 +202,33 @@ describe("GeneratorShell", () => {
     expect(genBodies).toHaveLength(3);
     expect(genBodies[2].currentCode).toBe(genBodies[1].currentCode);
     expect(genBodies[2].prompt).toBe("azul");
+  });
+
+  it("preview retry on v1 regenerates without currentCode, on v2 from v1", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await generateFirst(user);
+    await screen.findByText("Pronto — v1");
+
+    await user.click(
+      screen.getByRole("button", { name: "Preview: tentar de novo" }),
+    );
+    await waitFor(() => expect(genBodies).toHaveLength(2));
+    expect(genBodies[1]).toEqual({ prompt: "um card" });
+    expect(await screen.findByText("v1 de 1")).toBeInTheDocument();
+
+    await refine(user, "azul");
+    await screen.findByText("Pronto — v2");
+    await user.click(
+      screen.getByRole("button", { name: "Preview: tentar de novo" }),
+    );
+    await waitFor(() => expect(genBodies).toHaveLength(4));
+    expect(genBodies[3]).toEqual({
+      prompt: "azul",
+      currentCode: FIXED_COMPONENT.trim(),
+    });
+    expect(await screen.findByText("Pronto — v2")).toBeInTheDocument();
+    expect(screen.getByText("v2 de 2")).toBeInTheDocument();
   });
 
   it("Parar during refine keeps v1 and the typed text", async () => {

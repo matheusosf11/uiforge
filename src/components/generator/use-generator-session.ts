@@ -29,72 +29,103 @@ export function useGeneratorSession(opts?: { fetchImpl?: typeof fetch }) {
   const fetchImplRef = useRef(opts?.fetchImpl);
   fetchImplRef.current = opts?.fetchImpl;
 
-  const send = useCallback(async (text: string): Promise<SendResult> => {
-    const instruction = text.trim();
-    if (!instruction) return "ignored";
-    if (inFlightRef.current !== null || isBusy(stateRef.current)) {
-      return "ignored";
-    }
-
-    const base = committedVersion(stateRef.current);
-    if (base && base.code.length > MAX_CODE_LENGTH) {
-      dispatch({ type: "REJECT", kind: "too_large", instruction });
-      return "failed";
-    }
-
-    const id = ++reqIdRef.current;
-    const ac = new AbortController();
-    acRef.current = ac;
-    inFlightRef.current = id;
-    dispatch({ type: "START", id, instruction });
-
-    try {
-      const result = await streamGenerate(
-        { prompt: instruction, ...(base ? { currentCode: base.code } : {}) },
-        {
-          signal: ac.signal,
-          fetchImpl: fetchImplRef.current,
-          onText: (full) => dispatch({ type: "CHUNK", id, text: full }),
-        },
-      );
-
-      if (reqIdRef.current !== id || ac.signal.aborted) return "aborted";
-
-      if (result.ok) {
-        const code = parseCode(result.text);
-        const valid = code.trim() !== "" && hasDefaultExport(code);
-        dispatch({ type: "COMMIT", id, raw: result.text });
-        return valid ? "committed" : "failed";
+  // `base` null = fresh generation ({ prompt } only, no currentCode).
+  const run = useCallback(
+    async (text: string, base: Version | null): Promise<SendResult> => {
+      const instruction = text.trim();
+      if (!instruction) return "ignored";
+      if (inFlightRef.current !== null || isBusy(stateRef.current)) {
+        return "ignored";
       }
-      if (result.reason === "aborted") return "aborted";
-      if (result.reason === "http") {
-        if (result.status === 429) {
-          dispatch({ type: "FAIL", id, kind: "rate_limit" });
-        } else if (
-          result.status === 413 ||
-          result.body.includes("code_too_large")
-        ) {
-          dispatch({ type: "FAIL", id, kind: "too_large" });
-        } else {
-          dispatch({ type: "FAIL", id, kind: "failed" });
-        }
+
+      if (base && base.code.length > MAX_CODE_LENGTH) {
+        dispatch({ type: "REJECT", kind: "too_large", instruction });
         return "failed";
       }
-      dispatch({ type: "FAIL", id, kind: "failed" });
-      return "failed";
-    } finally {
-      if (inFlightRef.current === id) {
-        inFlightRef.current = null;
-        acRef.current = null;
-      }
-    }
-  }, []);
 
+      const id = ++reqIdRef.current;
+      const ac = new AbortController();
+      acRef.current = ac;
+      inFlightRef.current = id;
+      dispatch({ type: "START", id, instruction, baseId: base?.id ?? null });
+
+      try {
+        const result = await streamGenerate(
+          { prompt: instruction, ...(base ? { currentCode: base.code } : {}) },
+          {
+            signal: ac.signal,
+            fetchImpl: fetchImplRef.current,
+            onText: (full) => dispatch({ type: "CHUNK", id, text: full }),
+          },
+        );
+
+        if (reqIdRef.current !== id || ac.signal.aborted) return "aborted";
+
+        if (result.ok) {
+          const code = parseCode(result.text);
+          const valid = code.trim() !== "" && hasDefaultExport(code);
+          dispatch({ type: "COMMIT", id, raw: result.text });
+          return valid ? "committed" : "failed";
+        }
+        if (result.reason === "aborted") return "aborted";
+        if (result.reason === "http") {
+          if (result.status === 429) {
+            dispatch({ type: "FAIL", id, kind: "rate_limit" });
+          } else if (
+            result.status === 413 ||
+            result.body.includes("code_too_large")
+          ) {
+            dispatch({ type: "FAIL", id, kind: "too_large" });
+          } else {
+            dispatch({ type: "FAIL", id, kind: "failed" });
+          }
+          return "failed";
+        }
+        dispatch({ type: "FAIL", id, kind: "failed" });
+        return "failed";
+      } finally {
+        if (inFlightRef.current === id) {
+          inFlightRef.current = null;
+          acRef.current = null;
+        }
+      }
+    },
+    [],
+  );
+
+  const send = useCallback(
+    (text: string) => run(text, committedVersion(stateRef.current)),
+    [run],
+  );
+
+  // Re-send the failed instruction against the base it originally targeted
+  // (null base = first generation, retried without currentCode).
   const retry = useCallback(async (): Promise<SendResult> => {
-    const error = stateRef.current.error;
+    const s = stateRef.current;
+    const error = s.error;
     if (!error || error.kind === "too_large") return "ignored";
-    return send(error.instruction);
-  }, [send]);
+    const base =
+      error.baseId === null
+        ? null
+        : (s.versions.find((v) => v.id === error.baseId) ??
+          committedVersion(s));
+    return run(error.instruction, base);
+  }, [run]);
+
+  // Preview runtime-error retry: redo the committed version from its own
+  // base. v1 regenerates from the original prompt without currentCode; vN
+  // re-runs its instruction against the parent version, and COMMIT then
+  // truncates so the broken version is replaced instead of kept. Versions
+  // form a linear chain (COMMIT truncates to the base), so the parent is the
+  // previous index. Trade-off: once the 20-version cap has evicted the real
+  // first version, versions[0] is regenerated from its instruction alone.
+  const regenerate = useCallback(async (): Promise<SendResult> => {
+    const s = stateRef.current;
+    const current = committedVersion(s);
+    if (!current) return "ignored";
+    const parent = s.cursor > 0 ? (s.versions[s.cursor - 1] ?? null) : null;
+    return run(current.instruction, parent);
+  }, [run]);
 
   const stop = useCallback(() => {
     const id = inFlightRef.current;
@@ -127,6 +158,7 @@ export function useGeneratorSession(opts?: { fetchImpl?: typeof fetch }) {
     canUndo: selectCanUndo(state),
     send,
     retry,
+    regenerate,
     stop,
     undo,
     reset,

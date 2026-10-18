@@ -259,7 +259,7 @@ export function GeneratorShell() {
               regenerateLabel="Tentar de novo"
               // Mutually exclusive with the shell error banner's retry button.
               onRegenerate={
-                error ? undefined : () => void session.send(committed.instruction)
+                error ? undefined : () => void session.regenerate()
               }
               regenerateDisabled={busy}
             />

@@ -227,6 +227,77 @@ describe("useGeneratorSession", () => {
     expect(bodyOf(f, 2)).toEqual({ prompt: "dois", currentCode: CODE });
   });
 
+  it("regenerate on v1 resends the original prompt without currentCode", async () => {
+    const f = vi
+      .fn()
+      .mockImplementationOnce(async () => streamResponse([CODE]))
+      .mockImplementationOnce(async () => streamResponse([CODE2]));
+    const { result } = renderHook(() =>
+      useGeneratorSession({ fetchImpl: f as unknown as typeof fetch }),
+    );
+    await act(async () => {
+      await result.current.send("um card");
+    });
+    let r = "";
+    await act(async () => {
+      r = await result.current.regenerate();
+    });
+    expect(r).toBe("committed");
+    expect(bodyOf(f, 1)).toEqual({ prompt: "um card" });
+    expect(result.current.state.versions).toHaveLength(1);
+    expect(result.current.committed?.code).toBe(CODE2);
+  });
+
+  it("regenerate on vN re-runs its instruction against the parent and replaces it", async () => {
+    const CODE3 = "export default function C() { return <div>c</div>; }";
+    const f = vi
+      .fn()
+      .mockImplementationOnce(async () => streamResponse([CODE]))
+      .mockImplementationOnce(async () => streamResponse([CODE2]))
+      .mockImplementationOnce(async () => streamResponse([CODE3]));
+    const { result } = renderHook(() =>
+      useGeneratorSession({ fetchImpl: f as unknown as typeof fetch }),
+    );
+    await act(async () => {
+      await result.current.send("um");
+    });
+    await act(async () => {
+      await result.current.send("dois");
+    });
+    await act(async () => {
+      await result.current.regenerate();
+    });
+    expect(bodyOf(f, 2)).toEqual({ prompt: "dois", currentCode: CODE });
+    expect(result.current.state.versions.map((v) => v.code)).toEqual([
+      CODE,
+      CODE3,
+    ]);
+    expect(result.current.state.cursor).toBe(1);
+  });
+
+  it("retry after a failed v1 regenerate stays in generate mode", async () => {
+    const f = vi
+      .fn()
+      .mockImplementationOnce(async () => streamResponse([CODE]))
+      .mockImplementationOnce(async () => new Response("x", { status: 500 }))
+      .mockImplementationOnce(async () => streamResponse([CODE2]));
+    const { result } = renderHook(() =>
+      useGeneratorSession({ fetchImpl: f as unknown as typeof fetch }),
+    );
+    await act(async () => {
+      await result.current.send("um card");
+    });
+    await act(async () => {
+      await result.current.regenerate();
+    });
+    expect(result.current.state.error?.baseId).toBeNull();
+    await act(async () => {
+      await result.current.retry();
+    });
+    expect(bodyOf(f, 2)).toEqual({ prompt: "um card" });
+    expect(result.current.state.versions).toHaveLength(1);
+  });
+
   it("undo and reset dispatch; unmount aborts in-flight", async () => {
     const f = vi
       .fn()

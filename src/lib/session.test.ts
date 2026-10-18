@@ -118,6 +118,28 @@ describe("sessionReducer", () => {
     expect(failed.versions).toHaveLength(2);
   });
 
+  it("START with explicit baseId targets it; null base replaces from scratch", () => {
+    const base = commit(commit(initialSessionState, 1, code(1)), 2, code(2));
+    const fromParent = run(
+      [
+        { type: "START", id: 3, instruction: "again", baseId: base.versions[0].id },
+        { type: "COMMIT", id: 3, raw: code(3) },
+      ],
+      base,
+    );
+    expect(fromParent.versions.map((v) => v.code)).toEqual([code(1), code(3)]);
+    expect(fromParent.cursor).toBe(1);
+
+    const fresh = run(
+      [
+        { type: "START", id: 4, instruction: "first", baseId: null },
+        { type: "COMMIT", id: 4, raw: code(4) },
+      ],
+      commit(initialSessionState, 1, code(1)),
+    );
+    expect(fresh.versions.map((v) => v.code)).toEqual([code(4)]);
+  });
+
   it("ABORT clears pending without error; stale chunk/commit after abort are no-ops", () => {
     const s = run([
       { type: "START", id: 1, instruction: "a" },

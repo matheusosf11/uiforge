@@ -37,7 +37,9 @@ export type SessionState = {
 };
 
 export type SessionAction =
-  | { type: "START"; id: number; instruction: string }
+  // baseId: explicit base (null = fresh generation without currentCode);
+  // omitted = the committed version.
+  | { type: "START"; id: number; instruction: string; baseId?: number | null }
   | { type: "CHUNK"; id: number; text: string }
   | { type: "COMMIT"; id: number; raw: string }
   | { type: "FAIL"; id: number; kind: "failed" | "rate_limit" | "too_large" }
@@ -79,7 +81,10 @@ export function sessionReducer(
         pending: {
           id: action.id,
           instruction: action.instruction,
-          baseId: committedVersion(state)?.id ?? null,
+          baseId:
+            action.baseId !== undefined
+              ? action.baseId
+              : (committedVersion(state)?.id ?? null),
           text: "",
         },
         error: null,
