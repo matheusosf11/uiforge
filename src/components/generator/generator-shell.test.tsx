@@ -1,5 +1,5 @@
 /// <reference types="vitest/globals" />
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { GeneratorShell } from "@/components/generator/generator-shell";
 import { FIXED_COMPONENT, REFINED_COMPONENT } from "@/lib/ai/mock-model";
@@ -15,13 +15,19 @@ vi.mock("next/dynamic", () => ({
       code,
       updating,
       onRegenerate,
+      errorSource,
     }: {
       code: string;
       updating?: boolean;
       onRegenerate?: () => void;
+      errorSource?: "ai" | "user";
     }) {
       return (
-        <div data-testid="preview" data-code={code}>
+        <div
+          data-testid="preview"
+          data-code={code}
+          data-error-source={errorSource ?? "ai"}
+        >
           {updating ? "Atualizando…" : null}
           {onRegenerate ? (
             <button type="button" onClick={onRegenerate}>
@@ -730,5 +736,218 @@ describe("turn list", () => {
     expect(
       screen.getByRole("button", { name: "Histórico (1)" }),
     ).toHaveAttribute("aria-expanded", "false");
+  });
+});
+
+const MARK = " // marca";
+// Committed code is parseCode output (trimmed).
+const V1 = FIXED_COMPONENT.trim();
+const V2 = REFINED_COMPONENT.trim();
+
+function editor() {
+  return screen.getByRole("textbox", { name: "Editor de código" });
+}
+
+async function typeAtEnd(
+  user: ReturnType<typeof userEvent.setup>,
+  text: string,
+) {
+  const el = editor() as HTMLTextAreaElement;
+  const end = el.value.length;
+  await user.type(el, text, {
+    initialSelectionStart: end,
+    initialSelectionEnd: end,
+  });
+}
+
+async function removeMark(user: ReturnType<typeof userEvent.setup>) {
+  const el = editor() as HTMLTextAreaElement;
+  const end = el.value.length;
+  await user.type(el, "{Backspace}", {
+    initialSelectionStart: end - MARK.length,
+    initialSelectionEnd: end,
+  });
+}
+
+function preview() {
+  return screen.getByTestId("preview");
+}
+
+describe("editable code", () => {
+  it("has no editor before v1 and a read-only one while the first generation streams", async () => {
+    behaviors = ["hang"];
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    expect(
+      screen.queryByRole("textbox", { name: "Editor de código" }),
+    ).toBeNull();
+    expect(
+      screen.getByText("O código gerado aparecerá aqui."),
+    ).toBeInTheDocument();
+
+    await generateFirst(user);
+    const el = await screen.findByRole("textbox", { name: "Editor de código" });
+    expect(el).toHaveAttribute("readonly");
+  });
+
+  it("is editable after v1 and locked while a refine streams (D-05)", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await generateFirst(user);
+    await screen.findByText("Pronto — v1");
+
+    expect(editor()).not.toHaveAttribute("readonly");
+    expect(editor()).toHaveValue(V1);
+
+    behaviors = ["hang"];
+    await refine(user, "azul");
+    await screen.findByText("Refinando…");
+    expect(editor()).toHaveAttribute("readonly");
+    const before = (editor() as HTMLTextAreaElement).value;
+    await typeAtEnd(user, MARK);
+    expect(editor()).toHaveValue(before);
+    expect(screen.queryByText("Editado", { exact: true })).toBeNull();
+  });
+
+  it("shows the badge, discard button and draft row while dirty (D-06, D-13, D-14)", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await generateFirst(user);
+    await screen.findByText("Pronto — v1");
+
+    await typeAtEnd(user, MARK);
+    expect(editor()).toHaveValue(V1 + MARK);
+    expect(screen.getByText("Editado", { exact: true })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Descartar edições" }),
+    ).toBeInTheDocument();
+    expect(
+      within(list()).getByText("Edição manual (rascunho)"),
+    ).toBeInTheDocument();
+
+    await removeMark(user);
+    expect(editor()).toHaveValue(V1);
+    expect(screen.queryByText("Editado", { exact: true })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Descartar edições" }),
+    ).toBeNull();
+    expect(within(list()).queryByText("Edição manual (rascunho)")).toBeNull();
+  });
+
+  it("debounces the preview by 500 ms without the updating badge (D-11)", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<GeneratorShell />);
+      await generateFirst(user);
+      await screen.findByText("Pronto — v1");
+
+      await typeAtEnd(user, MARK);
+      expect(preview()).toHaveAttribute("data-code", V1);
+      act(() => {
+        vi.advanceTimersByTime(500);
+      });
+      expect(preview()).toHaveAttribute("data-code", V1 + MARK);
+      expect(screen.queryByText("Atualizando…")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("discards immediately, reverting editor and preview (D-13)", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await generateFirst(user);
+    await screen.findByText("Pronto — v1");
+
+    await typeAtEnd(user, MARK);
+    await waitFor(() =>
+      expect(preview()).toHaveAttribute("data-code", V1 + MARK),
+    );
+    await user.click(screen.getByRole("button", { name: "Descartar edições" }));
+    expect(editor()).toHaveValue(V1);
+    expect(preview()).toHaveAttribute("data-code", V1);
+    expect(within(list()).queryByText("Edição manual (rascunho)")).toBeNull();
+  });
+
+  it("hides the preview regenerate and flags user code while a draft exists (D-12)", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await generateFirst(user);
+    await screen.findByText("Pronto — v1");
+
+    expect(
+      screen.getByRole("button", { name: "Preview: tentar de novo" }),
+    ).toBeInTheDocument();
+    expect(preview()).toHaveAttribute("data-error-source", "ai");
+
+    await typeAtEnd(user, MARK);
+    expect(
+      screen.queryByRole("button", { name: "Preview: tentar de novo" }),
+    ).toBeNull();
+    expect(preview()).toHaveAttribute("data-error-source", "user");
+
+    await user.click(screen.getByRole("button", { name: "Descartar edições" }));
+    expect(
+      screen.getByRole("button", { name: "Preview: tentar de novo" }),
+    ).toBeInTheDocument();
+    expect(preview()).toHaveAttribute("data-error-source", "ai");
+  });
+
+  it("copies the draft text shown (D-17)", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await generateFirst(user);
+    await screen.findByText("Pronto — v1");
+
+    await typeAtEnd(user, MARK);
+    await user.click(screen.getByRole("button", { name: "Copiar" }));
+    await screen.findByRole("button", { name: "Copiado" });
+    expect(await navigator.clipboard.readText()).toBe(V1 + MARK);
+  });
+
+  it("keeps the base notice while editing a restored version (D-08)", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await twoVersions(user);
+    await user.click(
+      within(list()).getByRole("button", {
+        name: "Restaurar v1: um card. Concluída.",
+      }),
+    );
+    await screen.findByText("Voltou para v1");
+
+    await typeAtEnd(user, MARK);
+    expect(
+      screen.getByText("Refinar a partir da v1 — v2 será descartada"),
+    ).toBeInTheDocument();
+    const items = within(list()).getAllByRole("listitem");
+    expect(items[items.length - 1]).toHaveTextContent(
+      "Edição manual (rascunho)",
+    );
+  });
+
+  it("drops a stale draft when the cursor moves away (D-06)", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await twoVersions(user);
+
+    await typeAtEnd(user, MARK);
+    expect(screen.getByText("Editado", { exact: true })).toBeInTheDocument();
+    await user.click(
+      within(list()).getByRole("button", {
+        name: "Restaurar v1: um card. Concluída.",
+      }),
+    );
+    expect(screen.queryByText("Editado", { exact: true })).toBeNull();
+    expect(editor()).toHaveValue(V1);
+
+    await user.click(
+      within(list()).getByRole("button", {
+        name: "Restaurar v2: azul. Concluída. Será descartada ao refinar.",
+      }),
+    );
+    expect(editor()).toHaveValue(V2);
+    expect(screen.queryByText("Editado", { exact: true })).toBeNull();
   });
 });
