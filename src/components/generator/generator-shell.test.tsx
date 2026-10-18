@@ -115,7 +115,7 @@ async function generateFirst(user: ReturnType<typeof userEvent.setup>) {
 }
 
 async function refine(user: ReturnType<typeof userEvent.setup>, text: string) {
-  await user.type(screen.getByRole("textbox"), text);
+  await user.type(screen.getByRole("textbox", { name: "Descreva a mudança" }), text);
   await user.click(screen.getByRole("button", { name: "Refinar" }));
 }
 
@@ -138,7 +138,7 @@ describe("GeneratorShell", () => {
     expect(screen.queryByRole("button", { name: "Gerar" })).toBeNull();
     expect(screen.getByPlaceholderText(/Descreva a mudança/)).toBeInTheDocument();
     expect(screen.queryByRole("group", { name: "Exemplos" })).toBeNull();
-    expect(screen.getByRole("textbox")).toHaveValue("");
+    expect(screen.getByRole("textbox", { name: "Descreva a mudança" })).toHaveValue("");
     expect(screen.getByText("v1 · 1 versão")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Desfazer/ })).toBeDisabled();
     expect(screen.getByTestId("preview")).toHaveAttribute(
@@ -190,7 +190,7 @@ describe("GeneratorShell", () => {
 
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(REFINE_ERROR_MESSAGE);
-    expect(screen.getByRole("textbox")).toHaveValue("azul");
+    expect(screen.getByRole("textbox", { name: "Descreva a mudança" })).toHaveValue("azul");
     expect(screen.getByText("v1 · 1 versão")).toBeInTheDocument();
     expect(screen.getByTestId("preview")).toHaveAttribute(
       "data-code",
@@ -203,7 +203,7 @@ describe("GeneratorShell", () => {
     expect(genBodies[2].currentCode).toBe(genBodies[1].currentCode);
     expect(genBodies[2].prompt).toBe("azul");
     // D-02: the committed retry clears the field like a normal submit.
-    expect(screen.getByRole("textbox")).toHaveValue("");
+    expect(screen.getByRole("textbox", { name: "Descreva a mudança" })).toHaveValue("");
   });
 
   it("preview retry on v1 regenerates without currentCode, on v2 from v1", async () => {
@@ -246,7 +246,7 @@ describe("GeneratorShell", () => {
 
     await waitFor(() => expect(screen.queryByText("Refinando…")).toBeNull());
     expect(screen.getByText("v1 · 1 versão")).toBeInTheDocument();
-    expect(screen.getByRole("textbox")).toHaveValue("azul");
+    expect(screen.getByRole("textbox", { name: "Descreva a mudança" })).toHaveValue("azul");
     expect(screen.getByTestId("preview")).toHaveAttribute(
       "data-code",
       FIXED_COMPONENT.trim(),
@@ -268,7 +268,7 @@ describe("GeneratorShell", () => {
     await screen.findByText("Pronto — v2");
 
     // Ctrl+Z inside the textarea does nothing.
-    const box = screen.getByRole("textbox");
+    const box = screen.getByRole("textbox", { name: "Descreva a mudança" });
     await user.click(box);
     await user.keyboard("{Control>}z{/Control}");
     expect(screen.getByText("v2 · 2 versões")).toBeInTheDocument();
@@ -297,7 +297,7 @@ describe("GeneratorShell", () => {
     const user = userEvent.setup();
     render(<GeneratorShell />);
     await twoVersions(user);
-    await user.type(screen.getByRole("textbox"), "rascunho");
+    await user.type(screen.getByRole("textbox", { name: "Descreva a mudança" }), "rascunho");
 
     await user.click(screen.getByRole("button", { name: /Novo componente/ }));
     const dialog = await screen.findByRole("alertdialog");
@@ -357,7 +357,7 @@ describe("GeneratorShell", () => {
     expect(within(group).getAllByRole("button")).toHaveLength(4);
     const before = genBodies.length;
     await user.click(chip);
-    expect(screen.getByRole("textbox")).toHaveValue("Use uma cor mais forte.");
+    expect(screen.getByRole("textbox", { name: "Descreva a mudança" })).toHaveValue("Use uma cor mais forte.");
     expect(genBodies).toHaveLength(before);
   });
 
@@ -459,7 +459,7 @@ describe("turn list", () => {
     expect(
       screen.getByText("Refinar a partir da v1 — v2 será descartada"),
     ).toBeInTheDocument();
-    expect(screen.getByRole("textbox")).toHaveAttribute(
+    expect(screen.getByRole("textbox", { name: "Descreva a mudança" })).toHaveAttribute(
       "aria-describedby",
       "refine-base-notice prompt-char-count",
     );
@@ -484,7 +484,7 @@ describe("turn list", () => {
     );
     expect(await screen.findByText("Foi para v2")).toBeInTheDocument();
     expect(screen.queryByText(/^Refinar a partir da/)).toBeNull();
-    expect(screen.getByRole("textbox")).toHaveAttribute(
+    expect(screen.getByRole("textbox", { name: "Descreva a mudança" })).toHaveAttribute(
       "aria-describedby",
       "prompt-char-count",
     );
@@ -594,10 +594,10 @@ describe("turn list", () => {
     render(<GeneratorShell />);
     await twoVersions(user);
 
-    const pre = document.querySelector("#panel-code pre") as HTMLPreElement;
-    expect(pre).not.toBeNull();
-    pre.scrollTop = 500;
-    expect(pre.scrollTop).toBe(500);
+    const scroller = screen.getByTestId("code-scroll");
+    expect(scroller).not.toBeNull();
+    scroller.scrollTop = 500;
+    expect(scroller.scrollTop).toBe(500);
 
     await user.click(
       within(list()).getByRole("button", {
@@ -607,7 +607,7 @@ describe("turn list", () => {
     await screen.findByText("Voltou para v1");
     await waitFor(() =>
       expect(
-        (document.querySelector("#panel-code pre") as HTMLPreElement).scrollTop,
+        screen.getByTestId("code-scroll").scrollTop,
       ).toBe(0),
     );
   });
