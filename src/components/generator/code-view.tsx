@@ -44,7 +44,8 @@ const KEYCODE_Z = 90;
 /**
  * True for keys the library would use to rewrite the value even though the
  * textarea is readOnly (P1). Tab, Escape, arrows, copy, select-all and any other
- * browser shortcut are never matched, so focus is never trapped.
+ * browser shortcut are never matched, so focus is never trapped (Escape is
+ * handled separately by the read-only guard).
  */
 function rewritesValue(e: KeyboardEvent<HTMLElement>): boolean {
   if (e.key === "Enter" || e.key === "Backspace") return true;
@@ -204,8 +205,10 @@ export function CodeView({
   function handleKeyDown(e: KeyboardEvent<HTMLElement>) {
     if (readOnly) {
       // P1: the native readOnly attribute blocks typing; block only the keys
-      // the library itself would use to rewrite the value.
-      if (rewritesValue(e)) e.preventDefault();
+      // the library itself would use to rewrite the value, and Escape, whose
+      // library blur() would drop focus to <body> (WR-02). Tab still passes
+      // through (ignoreTabKey), so focus is never trapped.
+      if (e.key === "Escape" || rewritesValue(e)) e.preventDefault();
       return;
     }
     if (e.key === "Escape") {

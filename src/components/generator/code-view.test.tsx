@@ -264,7 +264,7 @@ describe("CodeView read-only lock", () => {
     expect(editor()).toHaveValue("abcx");
   });
 
-  it("does not trap Tab and never intercepts Tab, Escape or Ctrl+C", async () => {
+  it("does not trap Tab and never intercepts Tab or Ctrl+C", async () => {
     const user = userEvent.setup();
     const spy = vi.fn();
     render(<Harness initial={RO_CODE} spy={spy} readOnly after />);
@@ -276,10 +276,24 @@ describe("CodeView read-only lock", () => {
     const ta = editor();
     expect(fireEvent.keyDown(ta, { key: "Tab" })).toBe(true);
     expect(fireEvent.keyDown(ta, { key: "Tab", shiftKey: true })).toBe(true);
-    expect(fireEvent.keyDown(ta, { key: "Escape" })).toBe(true);
     expect(
       fireEvent.keyDown(ta, { key: "c", keyCode: 67, ctrlKey: true }),
     ).toBe(true);
+  });
+
+  it("Escape keeps focus in the read-only editor and Tab still leaves (WR-02)", async () => {
+    const user = userEvent.setup();
+    const spy = vi.fn();
+    render(<Harness initial={RO_CODE} spy={spy} readOnly after />);
+    const ta = editor();
+    await user.click(ta);
+    expect(fireEvent.keyDown(ta, { key: "Escape" })).toBe(false);
+    await user.keyboard("{Escape}");
+    expect(ta).toHaveFocus();
+    expect(ta).toHaveValue(RO_CODE);
+    await user.keyboard("{Tab}");
+    expect(screen.getByRole("button", { name: "depois" })).toHaveFocus();
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it("is read-only by default without onChange", () => {
