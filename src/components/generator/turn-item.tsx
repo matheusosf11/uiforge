@@ -1,7 +1,7 @@
 "use client";
 
 import type { Ref } from "react";
-import { AlertTriangle, Check, Loader2 } from "lucide-react";
+import { AlertTriangle, Check, Loader2, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type TurnItemProps = {
@@ -11,6 +11,11 @@ type TurnItemProps = {
   busy: boolean;
   onRestore: () => void;
   itemRef?: Ref<HTMLButtonElement>;
+  /**
+   * Lets the current item call onRestore (D-07: while a draft exists, clicking
+   * the base commits the draft and restores the base).
+   */
+  allowCurrentClick?: boolean;
 };
 
 const ROW =
@@ -37,6 +42,7 @@ export function TurnItem({
   busy,
   onRestore,
   itemRef,
+  allowCurrentClick = false,
 }: TurnItemProps) {
   const current = position === "current";
   const later = position === "later";
@@ -50,7 +56,7 @@ export function TurnItem({
       // Only busy disables: a disabled focused button would drop focus (D-19).
       disabled={busy}
       onClick={() => {
-        if (!current) onRestore();
+        if (!current || allowCurrentClick) onRestore();
       }}
       className={cn(
         "group",
@@ -88,11 +94,31 @@ export function TurnItem({
 }
 
 type TransientTurnItemProps = {
-  kind: "gerando" | "erro";
+  kind: "gerando" | "erro" | "rascunho";
+  /** Ignored by "rascunho". */
   instruction: string;
 };
 
+const DRAFT_TEXT = "Edição manual (rascunho)";
+
 export function TransientTurnItem({ kind, instruction }: TransientTurnItemProps) {
+  if (kind === "rascunho") {
+    return (
+      <div className={ROW}>
+        <span className="min-w-7 shrink-0" />
+        <span
+          className="min-w-0 flex-1 truncate text-muted-foreground"
+          title={DRAFT_TEXT}
+        >
+          {DRAFT_TEXT}
+        </span>
+        <Pencil
+          aria-hidden="true"
+          className="size-4 shrink-0 text-muted-foreground"
+        />
+      </div>
+    );
+  }
   const erro = kind === "erro";
   return (
     <div className={ROW}>

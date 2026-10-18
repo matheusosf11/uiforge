@@ -89,6 +89,24 @@ describe("TurnItem", () => {
     },
   );
 
+  it("calls onRestore on the current item with allowCurrentClick", async () => {
+    const onRestore = vi.fn();
+    render(
+      <TurnItem
+        number={2}
+        text="azul"
+        position="current"
+        busy={false}
+        onRestore={onRestore}
+        allowCurrentClick
+      />,
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "v2, versão atual: azul. Concluída." }),
+    );
+    expect(onRestore).toHaveBeenCalledTimes(1);
+  });
+
   it("renders 'Edição manual' text in the label", () => {
     render(
       <TurnItem
@@ -124,6 +142,22 @@ describe("TransientTurnItem", () => {
     expect(screen.queryByRole("button")).toBeNull();
     expect(container).toHaveTextContent("Erro: mais");
     expect(screen.getByText("erro")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("renders the rascunho row without a button, status word or sr-only prefix", () => {
+    const { container } = render(
+      <TransientTurnItem kind="rascunho" instruction="ignorada" />,
+    );
+    expect(screen.queryByRole("button")).toBeNull();
+    expect(container).toHaveTextContent(/^Edição manual \(rascunho\)$/);
+    const text = screen.getByText("Edição manual (rascunho)");
+    expect(text).toHaveAttribute("title", "Edição manual (rascunho)");
+    expect(screen.queryByText("gerando…")).toBeNull();
+    expect(screen.queryByText("erro")).toBeNull();
+    expect(container.querySelector(".sr-only")).toBeNull();
+    const svg = container.querySelector("svg");
+    expect(svg).toHaveAttribute("aria-hidden", "true");
+    expect(svg).toHaveClass("text-muted-foreground");
   });
 });
 
@@ -247,6 +281,43 @@ describe("TurnList", () => {
     expect(items).toHaveLength(4);
     expect(within(items[3]).queryByRole("button")).toBeNull();
     expect(items[3]).toHaveTextContent("Gerando: mais");
+  });
+
+  it("renders the rascunho row as the last item", () => {
+    renderList({ transient: { kind: "rascunho", instruction: "" } });
+    const items = within(list()).getAllByRole("listitem");
+    expect(items).toHaveLength(4);
+    expect(within(items[3]).queryByRole("button")).toBeNull();
+    expect(items[3]).toHaveTextContent("Edição manual (rascunho)");
+  });
+
+  it("keeps the rascunho row last after dimmed later versions", () => {
+    renderList({
+      versions: makeVersions(["um card", "azul"]),
+      cursor: 0,
+      transient: { kind: "rascunho", instruction: "" },
+    });
+    const items = within(list()).getAllByRole("listitem");
+    expect(items).toHaveLength(3);
+    expect(items[1]).toHaveTextContent("azul");
+    expect(items[2]).toHaveTextContent("Edição manual (rascunho)");
+  });
+
+  it("lets the current item restore while a draft is active", async () => {
+    const { props } = renderList({ draftActive: true });
+    await userEvent.click(
+      screen.getByRole("button", { name: "v3, versão atual: verde. Concluída." }),
+    );
+    expect(props.onRestore).toHaveBeenCalledTimes(1);
+    expect(props.onRestore).toHaveBeenCalledWith(props.versions[2].id);
+  });
+
+  it("keeps the current item a no-op without a draft", async () => {
+    const { props } = renderList();
+    await userEvent.click(
+      screen.getByRole("button", { name: "v3, versão atual: verde. Concluída." }),
+    );
+    expect(props.onRestore).not.toHaveBeenCalled();
   });
 
   it("renders no extra item without a transient", () => {

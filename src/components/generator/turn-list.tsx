@@ -9,7 +9,7 @@ import type { Version } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
 export type TurnTransient = {
-  kind: "gerando" | "erro";
+  kind: "gerando" | "erro" | "rascunho";
   instruction: string;
 } | null;
 
@@ -58,6 +58,8 @@ type TurnListProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onRestore: (versionId: number) => void;
+  /** A draft exists: the current item becomes clickable (D-07). */
+  draftActive?: boolean;
 };
 
 export function TurnList({
@@ -69,6 +71,7 @@ export function TurnList({
   open,
   onOpenChange,
   onRestore,
+  draftActive = false,
 }: TurnListProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const currentRef = useRef<HTMLButtonElement | null>(null);
@@ -133,6 +136,7 @@ export function TurnList({
                   busy={busy}
                   onRestore={() => onRestore(v.id)}
                   itemRef={position === "current" ? currentRef : undefined}
+                  allowCurrentClick={draftActive && position === "current"}
                 />
               </li>
             );
