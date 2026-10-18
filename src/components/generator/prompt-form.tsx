@@ -20,6 +20,10 @@ type PromptFormProps = {
   chips?: { id: string; label: string; prompt: string }[] | null;
   /** Rendered above the title row. */
   sessionBar?: ReactNode;
+  /** Rendered between the sessionBar and the title (turn/version list). */
+  turnList?: ReactNode;
+  /** Shown under the title and wired to the textarea description; not a live region. */
+  baseNotice?: string | null;
   textareaRef?: Ref<HTMLTextAreaElement>;
 };
 
@@ -34,6 +38,8 @@ export function PromptForm({
   mode = "generate",
   chips,
   sessionBar,
+  turnList,
+  baseNotice,
   textareaRef,
 }: PromptFormProps) {
   const refine = mode === "refine";
@@ -88,9 +94,15 @@ export function PromptForm({
       className="flex h-full min-h-64 flex-col rounded-xl border border-border bg-card p-4"
     >
       {sessionBar}
+      {turnList}
       <h2 className="mb-2 text-sm font-medium text-muted-foreground">
         {refine ? "Refinar componente" : "Prompt"}
       </h2>
+      {baseNotice ? (
+        <p id="refine-base-notice" className="mb-2 text-xs text-muted-foreground">
+          {baseNotice}
+        </p>
+      ) : null}
       <form
         className="flex min-h-0 flex-1 flex-col"
         onSubmit={handleSubmit}
@@ -103,7 +115,11 @@ export function PromptForm({
           onKeyDown={handleKeyDown}
           disabled={isLoading}
           maxLength={MAX_PROMPT_LENGTH}
-          aria-describedby="prompt-char-count"
+          aria-describedby={
+            baseNotice
+              ? "refine-base-notice prompt-char-count"
+              : "prompt-char-count"
+          }
           placeholder={
             refine
               ? "Descreva a mudança… (⌘/Ctrl+Enter para refinar)"
