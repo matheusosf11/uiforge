@@ -1,4 +1,5 @@
 import { GeneratorShell } from "@/components/generator/generator-shell";
+import { RobotCorner } from "@/components/generator/robot-corner";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 export default function Home() {
@@ -17,6 +18,7 @@ export default function Home() {
         </header>
 
         <GeneratorShell />
+        <RobotCorner />
       </div>
     </main>
   );

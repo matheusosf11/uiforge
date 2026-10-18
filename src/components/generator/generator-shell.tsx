@@ -11,7 +11,6 @@ import { TurnList } from "@/components/generator/turn-list";
 import type { TurnTransient } from "@/components/generator/turn-list";
 import { useGeneratorSession } from "@/components/generator/use-generator-session";
 import { useSuggestions } from "@/components/generator/use-suggestions";
-import { useShowcaseEnabled } from "@/components/generator/use-showcase-enabled";
 import { useUndoShortcut } from "@/components/generator/use-undo-shortcut";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,21 +38,6 @@ const SandboxPreview = dynamic(
 
 type Tab = "preview" | "code";
 
-// 3D showcase for the empty preview (dark + desktop only); loaded on demand so
-// framer-motion and the Spline runtime stay out of the main bundle.
-const PreviewShowcase = dynamic(
-  () =>
-    import("@/components/generator/preview-showcase").then(
-      (m) => m.PreviewShowcase,
-    ),
-  {
-    ssr: false,
-    loading: () => (
-      <PreviewPlaceholder text="O preview aparece aqui depois de gerar." />
-    ),
-  },
-);
-
 function PreviewPlaceholder({ text }: { text: string }) {
   return (
     <section
@@ -70,7 +54,6 @@ function PreviewPlaceholder({ text }: { text: string }) {
 
 export function GeneratorShell() {
   const session = useGeneratorSession();
-  const showcase = useShowcaseEnabled();
   const { state, committed, busy, canUndo } = session;
   const { pending, error, notice, versions, cursor } = state;
   const refineMode = versions.length > 0;
@@ -347,8 +330,6 @@ export function GeneratorShell() {
             />
           ) : pending ? (
             <PreviewPlaceholder text="Gerando preview…" />
-          ) : showcase ? (
-            <PreviewShowcase text="O preview aparece aqui depois de gerar." />
           ) : (
             <PreviewPlaceholder text="O preview aparece aqui depois de gerar." />
           )}
