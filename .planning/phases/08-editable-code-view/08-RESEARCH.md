@@ -421,13 +421,7 @@ RESOLVED by orchestrator (2026-10-18):
 3. Restoring the full discarded draft with Ctrl+Z is out of scope. The UI makes no promise about it.
 4. iOS zoom is prevented up front with `max-md:text-base` on the editor and the highlight layer together, so both stay identical.
 
-
-1. **"Edição salva" on refine.** UI-SPEC §6 says "Edição salva como vM, then immediately Refinando…". Batching makes the first string never render.
-   - Recommendation: `Edição salva como vM · Refinando…` while pending; it is substring-compatible. The planner should note the small UI-SPEC deviation.
-2. **Retry with a draft.** Not covered by CONTEXT or the UI-SPEC.
-   - Recommendation: commit, then retry the failed instruction from the manual version (Pattern 3). The alternative loses data.
-3. **Exact Ctrl+Z recovery after discard.**
-   - Recommendation: push a base record onto the stack on discard (optional; the copy promises nothing).
+(The original question list was removed after resolution; see items 1–4 above.)
 
 ## Environment Availability
 
