@@ -14,6 +14,7 @@ export function SandboxPreview({
   regenerateDisabled = false,
   updating = false,
   regenerateLabel = "Gerar de novo",
+  errorSource = "ai",
 }: {
   code: string;
   /** Offered when the generated code fails to compile/run in the preview. */
@@ -23,6 +24,11 @@ export function SandboxPreview({
   updating?: boolean;
   /** Label of the runtime-error retry button. */
   regenerateLabel?: string;
+  /**
+   * Who wrote the code, for the error copy. "user" = the code comes from the
+   * editor (a draft or a manual version); "ai" (default) = generated code.
+   */
+  errorSource?: "ai" | "user";
 }) {
   const srcDoc = useMemo(() => buildPreviewSrcdoc(code), [code]);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
@@ -60,6 +66,13 @@ export function SandboxPreview({
   }, [code, reloadKey]);
 
   const missingDefault = !hasDefaultExport(code);
+  const userCode = errorSource === "user";
+  const runtimeMessage = userCode
+    ? "Seu código tem um erro e o preview não conseguiu rodar. Corrija no editor ou descreva a correção em Refinar."
+    : "A IA gerou um código com erro e o preview não conseguiu rodar.";
+  const missingDefaultMessage = userCode
+    ? "O código não exporta um componente padrão. Adicione um export default ao componente."
+    : "O código gerado não exporta um componente padrão.";
 
   return (
     <section
@@ -83,7 +96,7 @@ export function SandboxPreview({
           role="alert"
           className="mb-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
         >
-          O código gerado não exporta um componente padrão.
+          {missingDefaultMessage}
         </p>
       ) : null}
       {runtimeError ? (
@@ -92,7 +105,7 @@ export function SandboxPreview({
           className="mb-2 flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p>A IA gerou um código com erro e o preview não conseguiu rodar.</p>
+            <p>{runtimeMessage}</p>
             {onRegenerate ? (
               <Button
                 type="button"

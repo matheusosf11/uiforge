@@ -1,5 +1,5 @@
 /// <reference types="vitest/globals" />
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import {
   PREVIEW_LOAD_TIMEOUT_MS,
   SandboxPreview,
@@ -76,6 +76,63 @@ describe("SandboxPreview", () => {
     });
     expect(screen.getByRole("button", { name: /Tentar de novo/ })).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Gerar de novo/ })).toBeNull();
+  });
+
+  describe("errorSource user", () => {
+    const valid = "export default function A(){return <div/>}";
+    function postError(message = "boom") {
+      act(() => {
+        window.dispatchEvent(
+          new MessageEvent("message", {
+            data: { type: "uiforge-preview-error", message },
+          }),
+        );
+      });
+    }
+
+    it("keeps the AI copy by default", () => {
+      render(<SandboxPreview code="function A(){return <div/>}" />);
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "O código gerado não exporta um componente padrão.",
+      );
+    });
+
+    it("speaks about the user's code on a runtime error", () => {
+      render(<SandboxPreview code={valid} errorSource="user" />);
+      postError("Unexpected token (3:1)");
+      const alert = screen.getByRole("alert");
+      expect(alert).toHaveTextContent(
+        "Seu código tem um erro e o preview não conseguiu rodar. Corrija no editor ou descreva a correção em Refinar.",
+      );
+      expect(alert).not.toHaveTextContent("A IA gerou");
+      expect(within(alert).getByText("Detalhes do erro")).toBeInTheDocument();
+      expect(alert).toHaveTextContent("Unexpected token (3:1)");
+    });
+
+    it("asks for an export default when it is missing", () => {
+      render(
+        <SandboxPreview code="function A(){return <div/>}" errorSource="user" />,
+      );
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "O código não exporta um componente padrão. Adicione um export default ao componente.",
+      );
+    });
+
+    it("renders no regenerate button without onRegenerate", () => {
+      render(<SandboxPreview code={valid} errorSource="user" />);
+      postError();
+      expect(screen.queryByRole("button")).toBeNull();
+    });
+
+    it("clears the runtime error when the code is fixed", () => {
+      const { rerender } = render(
+        <SandboxPreview code="export default function A(){return <div>}" errorSource="user" />,
+      );
+      postError();
+      expect(screen.getByRole("alert")).toBeInTheDocument();
+      rerender(<SandboxPreview code={valid} errorSource="user" />);
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
   });
 
   describe("load timeout", () => {
