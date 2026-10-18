@@ -22,10 +22,21 @@ const OUTPUT = join("docs", "demo.gif");
 // Each ladder step renders here; OUTPUT is replaced only by a GIF within the
 // size cap, so a failed or oversized run never clobbers the committed asset.
 const TMP_GIF = join("test-results", "demo", "demo.tmp.gif");
-const START = String(Number(process.env.DEMO_GIF_START ?? 1.5));
-const SPEED = Number(process.env.DEMO_GIF_SPEED ?? 1.35);
-const MAX_LEN = Number(process.env.DEMO_GIF_MAX ?? 25);
-const FLOOR = Math.max(0, Math.min(255, Math.round(Number(process.env.DEMO_GIF_FLOOR ?? 26))));
+// Tuning env vars: reject NaN and out-of-range values up front instead of
+// handing ffmpeg a broken filter (setpts=PTS/0, -ss NaN, lutrgb with NaN).
+function num(name, def, { min = 0, max = Infinity, gt = false } = {}) {
+  const raw = process.env[name];
+  const v = raw === undefined || raw.trim() === "" ? def : Number(raw);
+  if (!Number.isFinite(v) || (gt ? v <= min : v < min) || v > max) {
+    const range = `${gt ? ">" : ">="} ${min}${max < Infinity ? ` and <= ${max}` : ""}`;
+    fail(`${name} must be a number ${range} (got "${raw}")`);
+  }
+  return v;
+}
+const START = String(num("DEMO_GIF_START", 1.5));
+const SPEED = num("DEMO_GIF_SPEED", 1.35, { gt: true });
+const MAX_LEN = num("DEMO_GIF_MAX", 25, { gt: true });
+const FLOOR = Math.round(num("DEMO_GIF_FLOOR", 26, { max: 255 }));
 // The animated three.js background redraws faint lines (and VP8 noise) on every
 // frame, which defeats GIF frame diffing. Flattening near-black values to the
 // page background (#060606) removes them; the UI panels (~#202020) and the bright
