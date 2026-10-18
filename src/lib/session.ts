@@ -37,6 +37,7 @@ export type SessionNotice =
   | "undo"
   | "forward"
   | "reset"
+  | "loaded"
   | null;
 
 export type SessionState = {
@@ -73,7 +74,15 @@ export type SessionAction =
   | { type: "RESTORE"; versionId: number }
   // Save the user's edited code as a "manual" version (saved as-is).
   | { type: "COMMIT_MANUAL"; code: string }
-  | { type: "RESET" };
+  | { type: "RESET" }
+  // Replace the whole session with a saved project (ignored while pending).
+  | {
+      type: "LOAD";
+      versions: Version[];
+      cursor: number;
+      droppedCount: number;
+      nextVersionId: number;
+    };
 
 export const initialSessionState: SessionState = {
   versions: [],
@@ -344,6 +353,28 @@ export function sessionReducer(
         nextVersionId: state.nextVersionId,
         notice: "reset",
         droppedCount: 0,
+        savedManualId: null,
+      };
+    }
+    case "LOAD": {
+      if (state.pending !== null) return state;
+      if (
+        action.versions.length === 0 ||
+        action.cursor < 0 ||
+        action.cursor >= action.versions.length
+      ) {
+        return state;
+      }
+      const maxId = Math.max(...action.versions.map((v) => v.id));
+      return {
+        versions: action.versions,
+        cursor: action.cursor,
+        pending: null,
+        error: null,
+        // Never reuse an id: ids key React lists and the suggestion cache.
+        nextVersionId: Math.max(action.nextVersionId, maxId + 1, state.nextVersionId),
+        notice: "loaded",
+        droppedCount: action.droppedCount,
         savedManualId: null,
       };
     }

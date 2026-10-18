@@ -22,7 +22,7 @@ describe("NewComponentDialog", () => {
     expect(screen.getByRole("alertdialog")).toBeInTheDocument()
     expect(screen.getByText("Começar um novo componente?")).toBeInTheDocument()
     expect(screen.getByText("Cancelar")).toBeInTheDocument()
-    expect(screen.getByText("Descartar e começar")).toBeInTheDocument()
+    expect(screen.getByText("Começar novo")).toBeInTheDocument()
   })
 
   it("Esc requests close and does not confirm", async () => {
@@ -37,7 +37,7 @@ describe("NewComponentDialog", () => {
   it("confirm button calls onConfirm once", async () => {
     const user = userEvent.setup()
     const { onConfirm } = setup()
-    await user.click(screen.getByText("Descartar e começar"))
+    await user.click(screen.getByText("Começar novo"))
     expect(onConfirm).toHaveBeenCalledTimes(1)
   })
 })

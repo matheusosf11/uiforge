@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { KeyboardEvent } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 import { Highlight, themes } from "prism-react-renderer";
 import Editor from "react-simple-code-editor";
-import { Check, Copy, Download, X } from "lucide-react";
+import { Check, Copy, Download, GitCompare, X } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { componentFilename } from "@/lib/download-filename";
+import { cn } from "@/lib/utils";
 
 type CopyState = "idle" | "copied" | "failed";
 
@@ -71,6 +72,9 @@ export function CodeView({
   dirty = false,
   onDiscard,
   historyKey,
+  compare = null,
+  comparing = false,
+  onComparingChange,
 }: {
   /** Value shown: the draft, the committed version or the streaming code. */
   code: string;
@@ -87,6 +91,10 @@ export function CodeView({
   onDiscard?: () => void;
   /** Any change resets the editor's own undo history (P3). */
   historyKey?: string | number | null;
+  /** Version comparison shown instead of the editor; null hides "Comparar". */
+  compare?: ReactNode;
+  comparing?: boolean;
+  onComparingChange?: (comparing: boolean) => void;
 }) {
   const readOnly = readOnlyProp ?? (busy || !onChange);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -242,6 +250,24 @@ export function CodeView({
           ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
+          {compare !== null && onComparingChange ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className={cn(
+                "text-xs max-md:min-h-11",
+                comparing && "bg-muted text-foreground",
+              )}
+              aria-pressed={comparing}
+              disabled={busy}
+              onClick={() => onComparingChange(!comparing)}
+              title="Comparar duas versões"
+            >
+              <GitCompare aria-hidden />
+              Comparar
+            </Button>
+          ) : null}
           {showDraftControls && onDiscard ? (
             <Button
               type="button"
@@ -282,7 +308,9 @@ export function CodeView({
           </Button>
         </div>
       </div>
-      {showEditor ? (
+      {comparing && compare !== null ? (
+        compare
+      ) : showEditor ? (
         <>
           <label htmlFor={EDITOR_ID} className="sr-only">
             Editor de código

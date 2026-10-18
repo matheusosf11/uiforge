@@ -234,6 +234,21 @@ export function useGeneratorSession(opts?: { fetchImpl?: typeof fetch }) {
     dispatch({ type: "RESET" });
   }, []);
 
+  // Opens a saved project. Returns false while a request runs.
+  const load = useCallback(
+    (snapshot: {
+      versions: Version[];
+      cursor: number;
+      droppedCount: number;
+      nextVersionId: number;
+    }): boolean => {
+      if (inFlightRef.current !== null || isBusy(stateRef.current)) return false;
+      dispatch({ type: "LOAD", ...snapshot });
+      return true;
+    },
+    [],
+  );
+
   useEffect(() => {
     return () => {
       acRef.current?.abort();
@@ -255,5 +270,10 @@ export function useGeneratorSession(opts?: { fetchImpl?: typeof fetch }) {
     undo,
     restore,
     reset,
+    load,
+    // Saves an edited draft as a manual version (e.g. before switching project).
+    commitDraft: commitManual,
+    // Latest state, including actions dispatched in this same handler.
+    getState: () => stateRef.current,
   };
 }

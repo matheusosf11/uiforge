@@ -117,10 +117,13 @@ beforeEach(() => {
   baseOverride = null;
   suggestFails = false;
   installFetch();
+  // Projects are saved in localStorage; every test starts from a clean browser.
+  window.localStorage.clear();
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  window.localStorage.clear();
 });
 
 async function generateFirst(user: ReturnType<typeof userEvent.setup>) {
@@ -325,7 +328,7 @@ describe("GeneratorShell", () => {
 
     await user.click(screen.getByRole("button", { name: /Novo componente/ }));
     await user.click(
-      await screen.findByRole("button", { name: "Descartar e começar" }),
+      await screen.findByRole("button", { name: "Começar novo" }),
     );
 
     expect(await screen.findByText("Novo componente iniciado")).toBeInTheDocument();
@@ -736,7 +739,7 @@ describe("turn list", () => {
 
     await user.click(screen.getByRole("button", { name: /Novo componente/ }));
     await user.click(
-      await screen.findByRole("button", { name: "Descartar e começar" }),
+      await screen.findByRole("button", { name: "Começar novo" }),
     );
     await screen.findByText("Novo componente iniciado");
     await generateFirst(user);
@@ -1299,7 +1302,7 @@ describe("draft commit before actions", () => {
       within(dialog).getByText("Começar um novo componente?"),
     ).toBeInTheDocument();
     await user.click(
-      within(dialog).getByRole("button", { name: "Descartar e começar" }),
+      within(dialog).getByRole("button", { name: "Começar novo" }),
     );
     expect(
       await screen.findByText("Novo componente iniciado"),
@@ -1408,5 +1411,90 @@ describe("draft commit before actions", () => {
     expect(screen.getByText("Editado", { exact: true })).toBeInTheDocument();
     expect(screen.getByText("v1 · 1 versão")).toBeInTheDocument();
     expect(genBodies).toHaveLength(1);
+  });
+});
+
+describe("saved projects (localStorage)", () => {
+  it("auto-saves every version and restores the project after a reload", async () => {
+    const user = userEvent.setup();
+    const first = render(<GeneratorShell />);
+    await twoVersions(user);
+    await user.click(screen.getByRole("button", { name: "Desfazer" }));
+    await screen.findByText("Voltou para v1");
+    const v1Code = screen.getByTestId("preview").getAttribute("data-code");
+    first.unmount();
+
+    render(<GeneratorShell />);
+    expect(await screen.findByText("Projeto aberto — v1")).toBeInTheDocument();
+    expect(screen.getByText("v1 · 2 versões")).toBeInTheDocument();
+    expect(screen.getByTestId("preview").getAttribute("data-code")).toBe(v1Code);
+  });
+
+  it("Novo componente keeps the old project, and Projetos opens it again", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await generateFirst(user);
+    await screen.findByText("Pronto — v1");
+    await user.click(screen.getByRole("button", { name: /Novo componente/ }));
+    await user.type(await screen.findByRole("textbox", { name: "Prompt" }), "uma tabela");
+    await user.click(screen.getByRole("button", { name: "Gerar" }));
+    await screen.findByText("Pronto — v1");
+
+    await user.click(screen.getByRole("button", { name: /^Projetos/ }));
+    const dialog = await screen.findByRole("dialog", { name: "Projetos salvos" });
+    const items = within(dialog).getAllByRole("listitem");
+    expect(items.map((li) => li.textContent)).toEqual([
+      expect.stringContaining("uma tabela"),
+      expect.stringContaining("um card"),
+    ]);
+    expect(within(items[0]).getByText(/Aberto agora/)).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Abrir uma tabela" })).toBeDisabled();
+
+    await user.click(within(dialog).getByRole("button", { name: "Abrir um card" }));
+    expect(await screen.findByText("Projeto aberto — v1")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Projetos salvos" })).toBeNull(),
+    );
+  });
+
+  it("deletes a saved project after an inline confirmation", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await generateFirst(user);
+    await screen.findByText("Pronto — v1");
+    await user.click(screen.getByRole("button", { name: /Novo componente/ }));
+
+    await user.click(screen.getByRole("button", { name: /^Projetos/ }));
+    const dialog = await screen.findByRole("dialog", { name: "Projetos salvos" });
+    await user.click(within(dialog).getByRole("button", { name: "Excluir um card" }));
+    await user.click(within(dialog).getByRole("button", { name: "Excluir" }));
+    expect(within(dialog).getByText(/Nenhum projeto salvo ainda/)).toBeInTheDocument();
+    expect(JSON.parse(window.localStorage.getItem("uiforge:projects:v1")!).projects).toEqual([]);
+  });
+});
+
+describe("Comparar versions", () => {
+  it("is offered from v2 on and shows the line diff between two versions", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await generateFirst(user);
+    await screen.findByText("Pronto — v1");
+    expect(screen.queryByRole("button", { name: "Comparar" })).toBeNull();
+    await refine(user, "azul");
+    await screen.findByText("Pronto — v2");
+
+    await user.click(screen.getByRole("button", { name: "Comparar" }));
+    expect(screen.getByRole("button", { name: "Comparar" })).toHaveAttribute("aria-pressed", "true");
+    const region = screen.getByRole("region", { name: "Diferenças entre v1 e v2" });
+    expect(within(region).getAllByText(/^Adicionada:/).length).toBeGreaterThan(0);
+    expect(screen.getByLabelText("De")).toHaveValue("0");
+    expect(screen.getByLabelText("para")).toHaveValue("1");
+
+    // Same version on both sides: no differences.
+    await user.selectOptions(screen.getByLabelText("De"), "1");
+    expect(screen.getByText("As duas versões têm o mesmo código.")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Comparar" }));
+    expect(screen.getByLabelText("Editor de código")).toBeInTheDocument();
   });
 });

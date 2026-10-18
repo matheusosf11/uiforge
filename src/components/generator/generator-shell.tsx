@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { FilePlus2, RotateCcw } from "lucide-react";
+import { FilePlus2, FolderOpen, RotateCcw } from "lucide-react";
 import { CodeView } from "@/components/generator/code-view";
 import { DiscardDraftDialog } from "@/components/generator/discard-draft-dialog";
 import { NewComponentDialog } from "@/components/generator/new-component-dialog";
 import { PanelBoard } from "@/components/generator/panel-board";
+import { ProjectsDialog } from "@/components/generator/projects-dialog";
 import { PromptForm } from "@/components/generator/prompt-form";
 import { SessionBar } from "@/components/generator/session-bar";
 import { TurnList } from "@/components/generator/turn-list";
@@ -16,6 +17,7 @@ import { useGeneratorSession } from "@/components/generator/use-generator-sessio
 import { useSuggestions } from "@/components/generator/use-suggestions";
 import { useMediaQuery } from "@/components/generator/use-media-query";
 import { useUndoShortcut } from "@/components/generator/use-undo-shortcut";
+import { VersionDiff } from "@/components/generator/version-diff";
 import { Button } from "@/components/ui/button";
 import {
   CODE_TOO_LARGE_MESSAGE,
@@ -24,6 +26,14 @@ import {
   REFINE_ERROR_MESSAGE,
 } from "@/lib/generate-error";
 import { parseCode } from "@/lib/parse-code";
+import {
+  loadProjects,
+  newProjectId,
+  removeProject,
+  upsertProject,
+  writeProjects,
+  type ProjectStore,
+} from "@/lib/project-store";
 import {
   imageDataUrl,
   MAX_IMAGES,
@@ -104,6 +114,16 @@ export function GeneratorShell() {
     number: number;
   } | null>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
+  // Projects saved in this browser. projectId is null until the saved
+  // session (if any) is restored after mount, so nothing is saved before.
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [projectStore, setProjectStore] = useState<ProjectStore>({
+    currentId: null,
+    projects: [],
+  });
+  const [projectsOpen, setProjectsOpen] = useState(false);
+  const projectsBtnRef = useRef<HTMLButtonElement | null>(null);
+  const [comparing, setComparing] = useState(false);
 
   const suggestions = useSuggestions(
     committed ? { id: committed.id, code: committed.code } : null,
@@ -119,6 +139,38 @@ export function GeneratorShell() {
         : null,
     [committed, suggestions.suggestions],
   );
+
+  // Restore the last open project once, after mount (localStorage is
+  // browser-only, so the server render always starts empty).
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
+  useEffect(() => {
+    const store = loadProjects();
+    setProjectStore(store);
+    const saved = store.projects.find((p) => p.id === store.currentId);
+    if (saved && sessionRef.current.load(saved)) setProjectId(saved.id);
+    else setProjectId(newProjectId());
+  }, []);
+
+  // Auto-save every committed change (versions, cursor). Streaming text and
+  // drafts are not saved: only what is a version survives a reload.
+  useEffect(() => {
+    if (projectId === null || pending || versions.length === 0) return;
+    const store = upsertProject(loadProjects(), projectId, {
+      versions,
+      cursor,
+      droppedCount: state.droppedCount,
+      nextVersionId: state.nextVersionId,
+    });
+    setProjectStore(writeProjects(store) ?? store);
+  }, [
+    projectId,
+    pending,
+    versions,
+    cursor,
+    state.droppedCount,
+    state.nextVersionId,
+  ]);
 
   // D-06: shell-only draft of the current version. Text equal to the base is
   // no draft; a draft whose base is no longer current never renders.
@@ -205,6 +257,7 @@ export function GeneratorShell() {
   else if (notice === "undo") status = prefix + `Voltou para v${n}`;
   else if (notice === "forward") status = prefix + `Foi para v${n}`;
   else if (notice === "reset") status = "Novo componente iniciado";
+  else if (notice === "loaded") status = `Projeto aberto — v${n}`;
 
   // D-09/D-10/D-11: streaming row while pending (Parar clears it); error row
   // only for a failed refine (a failed first generation has no list).
@@ -357,7 +410,50 @@ export function GeneratorShell() {
     suggestions.reset();
     setHistoryOpen(false);
     setPreviewImages([]);
+    setComparing(false);
+    // The current project stays saved; the next commit starts a new one, and
+    // a reload before that opens the empty generator.
+    setProjectId(newProjectId());
+    const store = { ...loadProjects(), currentId: null };
+    setProjectStore(writeProjects(store) ?? store);
     // D-13: prompt text (and attached images) is intentionally preserved.
+  }
+
+  function openProject(id: string) {
+    const target = projectStore.projects.find((p) => p.id === id);
+    if (!target || busy) return;
+    // Keep the current work: an unsaved draft becomes a manual version and
+    // the project is written before the session is replaced.
+    session.commitDraft(draftCode);
+    const current = session.getState();
+    let store = loadProjects();
+    if (projectId !== null && current.versions.length > 0) {
+      store = upsertProject(store, projectId, {
+        versions: current.versions,
+        cursor: current.cursor,
+        droppedCount: current.droppedCount,
+        nextVersionId: current.nextVersionId,
+      });
+    }
+    if (!session.load(target)) return;
+    store = { ...store, currentId: target.id };
+    setProjectStore(writeProjects(store) ?? store);
+    setProjectId(target.id);
+    setDraft(null);
+    // Version ids repeat across projects: drop chips cached by id.
+    suggestions.reset();
+    setPreviewImages([]);
+    setHistoryOpen(false);
+    setComparing(false);
+    setProjectsOpen(false);
+  }
+
+  function deleteProject(id: string) {
+    const store = removeProject(loadProjects(), id);
+    setProjectStore(writeProjects(store) ?? store);
+    // Deleting the open project also clears it from the screen, otherwise the
+    // next auto-save would bring it back.
+    if (id === projectId) doReset();
   }
 
   function requestNew() {
@@ -444,13 +540,31 @@ export function GeneratorShell() {
 
   const statusAndError = (
     <>
-      <p
-        aria-live="polite"
-        aria-atomic="true"
-        className="min-h-5 text-sm text-muted-foreground"
-      >
-        {status}
-      </p>
+      <div className="flex min-h-5 items-center justify-between gap-2">
+        <p
+          aria-live="polite"
+          aria-atomic="true"
+          className="min-h-5 text-sm text-muted-foreground"
+        >
+          {status}
+        </p>
+        <Button
+          ref={projectsBtnRef}
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="shrink-0 text-xs max-md:min-h-11"
+          onClick={() => setProjectsOpen(true)}
+        >
+          <FolderOpen aria-hidden />
+          Projetos
+          {projectStore.projects.length > 0 ? (
+            <span className="tabular-nums text-muted-foreground">
+              ({projectStore.projects.length})
+            </span>
+          ) : null}
+        </Button>
+      </div>
       {errorMessage ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2">
           <p role="alert" className="text-sm text-destructive">
@@ -523,6 +637,19 @@ export function GeneratorShell() {
       dirty={dirty}
       onDiscard={handleDiscard}
       historyKey={historyKey}
+      compare={
+        versions.length > 1 ? (
+          <VersionDiff
+            // Remount on a new cursor or project so the default pair follows.
+            key={`${projectId}:${cursor}:${versions.length}`}
+            versions={versions}
+            droppedCount={state.droppedCount}
+            cursor={cursor}
+          />
+        ) : null
+      }
+      comparing={comparing && versions.length > 1 && !pending}
+      onComparingChange={setComparing}
     />
   );
 
@@ -538,6 +665,16 @@ export function GeneratorShell() {
         finalFocusRef={newBtnRef}
         // Focus lands on the textarea via the dialog's finalFocus on confirm.
         confirmFocusRef={textareaRef}
+      />
+      <ProjectsDialog
+        open={projectsOpen}
+        onOpenChange={setProjectsOpen}
+        projects={projectStore.projects}
+        currentId={versions.length > 0 ? projectId : null}
+        canOpen={!busy}
+        onOpen={openProject}
+        onDelete={deleteProject}
+        finalFocusRef={projectsBtnRef}
       />
       <DiscardDraftDialog
         open={discardTarget !== null}

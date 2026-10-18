@@ -55,8 +55,9 @@ export function NewComponentDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>Começar um novo componente?</AlertDialogTitle>
           <AlertDialogDescription>
-            Isso descarta todas as versões desta sessão. O texto do campo de
-            prompt será mantido.
+            O componente atual continua salvo em Projetos, com todas as
+            versões. Edições no código que ainda não viraram versão são
+            descartadas. O texto do campo de prompt será mantido.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -67,7 +68,7 @@ export function NewComponentDialog({
               onConfirm()
             }}
           >
-            Descartar e começar
+            Começar novo
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

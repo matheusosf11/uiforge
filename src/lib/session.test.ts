@@ -578,3 +578,39 @@ describe("canRegenerate with manual versions (D-12)", () => {
     expect(canRegenerate(c)).toBe(true);
   });
 });
+
+describe("LOAD", () => {
+  const versions = [
+    { id: 4, code: "export default function A(){}", instruction: "a", source: "ai" as const },
+    { id: 7, code: "export default function B(){}", instruction: "b", source: "ai" as const },
+  ];
+
+  it("replaces the session with a saved project and never reuses ids", () => {
+    const next = sessionReducer(initialSessionState, {
+      type: "LOAD",
+      versions,
+      cursor: 0,
+      droppedCount: 2,
+      nextVersionId: 5,
+    });
+    expect(next).toMatchObject({
+      versions,
+      cursor: 0,
+      droppedCount: 2,
+      nextVersionId: 8,
+      notice: "loaded",
+      pending: null,
+      error: null,
+    });
+  });
+
+  it("is ignored while pending and for invalid snapshots", () => {
+    const busy = sessionReducer(initialSessionState, { type: "START", id: 1, instruction: "x" });
+    const load = { type: "LOAD" as const, versions, cursor: 1, droppedCount: 0, nextVersionId: 8 };
+    expect(sessionReducer(busy, load)).toBe(busy);
+    expect(sessionReducer(initialSessionState, { ...load, cursor: 2 })).toBe(initialSessionState);
+    expect(sessionReducer(initialSessionState, { ...load, versions: [], cursor: 0 })).toBe(
+      initialSessionState,
+    );
+  });
+});
