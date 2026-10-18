@@ -74,7 +74,7 @@ export function CodeView({
 }: {
   /** Value shown: the draft, the committed version or the streaming code. */
   code: string;
-  /** Disables Copiar/Baixar. */
+  /** Disables Copiar/Baixar; keeps the editor mounted even while empty. */
   busy?: boolean;
   /** Changing to a new non-null value scrolls the code back to the top (D-12). */
   scrollResetKey?: string | number | null;
@@ -104,7 +104,11 @@ export function CodeView({
   const prismTheme =
     mounted && resolvedTheme === "light" ? themes.nightOwlLight : themes.nightOwl;
 
-  const showEditor = code !== "" || !readOnly;
+  // WR-03: the editor (and its hint) stays mounted while streaming, even
+  // before the first chunk, so focus and layout survive the start of a run.
+  // Only the idle, empty, read-only state (no version yet) shows the
+  // placeholder.
+  const showEditor = code !== "" || !readOnly || busy;
 
   useEffect(() => {
     return () => {

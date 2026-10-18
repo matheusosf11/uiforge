@@ -124,9 +124,12 @@ export function GeneratorShell() {
   }, [draft, committedId, hasPending]);
 
   // D-14/D-05: stream the new code live; pending clears on failure/stop, which
-  // reverts the panel to the last committed version (or its draft).
+  // reverts the panel to the last committed version (or its draft). WR-03:
+  // until the first parsed chunk arrives, keep showing the committed code so
+  // the editor never flashes empty at the start of a refine.
+  const streamed = pending ? parseCode(pending.text) : "";
   const editorValue = pending
-    ? parseCode(pending.text)
+    ? streamed || (committed?.code ?? "")
     : (draftCode ?? committed?.code ?? "");
 
   // D-11: the preview follows the draft 500 ms after the last keystroke;

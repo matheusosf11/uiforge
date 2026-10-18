@@ -296,6 +296,18 @@ describe("CodeView read-only lock", () => {
     expect(spy).not.toHaveBeenCalled();
   });
 
+  it("stays mounted and focused when a run starts with empty code (WR-03)", () => {
+    const { rerender } = render(<CodeView code={CODE_A} onChange={() => {}} />);
+    const ta = editor();
+    act(() => ta.focus());
+    rerender(<CodeView code="" onChange={() => {}} busy readOnly />);
+    expect(editor()).toBe(ta);
+    expect(ta).toHaveFocus();
+    expect(ta).toHaveAttribute("readonly");
+    expect(screen.getByText("Esc e depois Tab para sair")).toBeInTheDocument();
+    expect(screen.queryByText("O código gerado aparecerá aqui.")).toBeNull();
+  });
+
   it("is read-only by default without onChange", () => {
     render(<CodeView code={CODE_A} />);
     expect(editor()).toHaveAttribute("readonly");

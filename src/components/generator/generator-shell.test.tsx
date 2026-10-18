@@ -47,7 +47,7 @@ vi.mock("next/dynamic", () => ({
 }));
 
 type GenBody = { prompt: string; currentCode?: string };
-type GenBehavior = "ok" | "hang" | "error";
+type GenBehavior = "ok" | "hang" | "error" | "silent";
 
 const SUGGESTIONS = [
   { label: "Cor forte", instruction: "Use uma cor mais forte." },
@@ -76,6 +76,7 @@ function streamResponse(
           // already closed
         }
       });
+      if (mode === "silent") return;
       if (mode === "ok") {
         controller.enqueue(enc.encode(text));
         controller.close();
@@ -814,6 +815,34 @@ describe("editable code", () => {
     await typeAtEnd(user, MARK);
     expect(editor()).toHaveValue(before);
     expect(screen.queryByText("Editado", { exact: true })).toBeNull();
+  });
+
+  it("keeps the editor, its value and the hint mounted before the first chunk (WR-03)", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await generateFirst(user);
+    await screen.findByText("Pronto — v1");
+    const before = editor();
+
+    behaviors = ["silent"];
+    await refine(user, "azul");
+    await screen.findByText("Refinando…");
+    expect(editor()).toBe(before);
+    expect(editor()).toHaveAttribute("readonly");
+    expect(editor()).toHaveValue(V1);
+    expect(screen.getByText("Esc e depois Tab para sair")).toBeInTheDocument();
+    expect(screen.queryByText("O código gerado aparecerá aqui.")).toBeNull();
+  });
+
+  it("shows a read-only editor, not the placeholder, as the first generation starts (WR-03)", async () => {
+    behaviors = ["silent"];
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await generateFirst(user);
+    await screen.findByText("Gerando…");
+    expect(editor()).toHaveAttribute("readonly");
+    expect(editor()).toHaveValue("");
+    expect(screen.queryByText("O código gerado aparecerá aqui.")).toBeNull();
   });
 
   it("shows the badge, discard button and draft row while dirty (D-06, D-13, D-14)", async () => {
