@@ -59,6 +59,32 @@ describe("SandboxPreview", () => {
     expect(before.getAttribute("srcdoc")).toBe(srcdoc);
   });
 
+  it("keeps the current preview visible while new code loads", () => {
+    const a = "export default function A(){return <div>a</div>}";
+    const b = "export default function B(){return <div>b</div>}";
+    const { rerender } = render(<SandboxPreview code={a} />);
+    const front = screen.getByTitle("Live preview");
+    const oldDoc = front.getAttribute("srcdoc");
+
+    rerender(<SandboxPreview code={b} />);
+    // The old preview stays in front; the new one loads hidden behind it.
+    expect(screen.getByTitle("Live preview")).toBe(front);
+    expect(front.getAttribute("srcdoc")).toBe(oldDoc);
+    const back = screen.getByTitle("Live preview (carregando)");
+    expect(back.getAttribute("aria-hidden")).toBe("true");
+    expect(back.getAttribute("srcdoc")).not.toBe(oldDoc);
+
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent("message", { data: { type: "uiforge-preview-ready" } }),
+      );
+    });
+    // Promoted without remounting; the old iframe is gone.
+    expect(screen.getByTitle("Live preview")).toBe(back);
+    expect(screen.queryByTitle("Live preview (carregando)")).toBeNull();
+    expect(front.isConnected).toBe(false);
+  });
+
   it("uses a custom regenerateLabel on the runtime-error button", () => {
     render(
       <SandboxPreview

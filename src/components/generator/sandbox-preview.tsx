@@ -1,12 +1,37 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { buildPreviewSrcdoc } from "@/lib/preview-srcdoc";
 import { hasDefaultExport } from "@/lib/has-default-export";
 
 export const PREVIEW_LOAD_TIMEOUT_MS = 15000;
+
+/**
+ * Two iframe slots: the front one stays visible while new code loads in the
+ * hidden back one, which is promoted once it reports back (ready, error or
+ * timeout). Swapping roles never reloads an iframe, so edits don't flash a
+ * blank preview.
+ */
+type Frames = {
+  front: 0 | 1;
+  docs: [string | null, string | null];
+  /** The srcdoc of the newest code (front, or back while pending). */
+  latest: string;
+};
+
+function initialFrames(srcDoc: string): Frames {
+  return { front: 0, docs: [srcDoc, null], latest: srcDoc };
+}
+
+function promote(f: Frames): Frames {
+  const back = f.front === 0 ? 1 : 0;
+  if (f.docs[back] === null) return f;
+  const docs: Frames["docs"] = [null, null];
+  docs[back] = f.docs[back];
+  return { ...f, front: back, docs };
+}
 
 export function SandboxPreview({
   code,
@@ -35,18 +60,53 @@ export function SandboxPreview({
   const [timedOut, setTimedOut] = useState(false);
   // Bumped by "Recarregar preview" to remount the iframe and refetch the runtime.
   const [reloadKey, setReloadKey] = useState(0);
+  const [frames, setFrames] = useState(() => initialFrames(srcDoc));
+  const slotRefs = useRef<[HTMLIFrameElement | null, HTMLIFrameElement | null]>([
+    null,
+    null,
+  ]);
+  if (frames.latest !== srcDoc) {
+    // New code: load it behind the visible preview (or show it directly when
+    // it is what the front already holds).
+    const back = frames.front === 0 ? 1 : 0;
+    const docs: Frames["docs"] = [...frames.docs];
+    if (frames.docs[frames.front] === srcDoc) docs[back] = null;
+    else docs[back] = srcDoc;
+    setFrames({ ...frames, docs, latest: srcDoc });
+  }
+  const framesRef = useRef(frames);
+  framesRef.current = frames;
 
   useEffect(() => {
     setRuntimeError(null);
     setTimedOut(false);
     // A runtime script that never finishes loading (blocked or stalled network)
     // leaves the iframe blank without any error event, so watch for silence.
-    const timer = window.setTimeout(
-      () => setTimedOut(true),
-      PREVIEW_LOAD_TIMEOUT_MS,
-    );
+    const timer = window.setTimeout(() => {
+      setFrames(promote);
+      setTimedOut(true);
+    }, PREVIEW_LOAD_TIMEOUT_MS);
     function onMessage(event: MessageEvent) {
       if (!event.data || typeof event.data !== "object") return;
+      if (
+        event.data.type !== "uiforge-preview-error" &&
+        event.data.type !== "uiforge-preview-ready"
+      ) {
+        return;
+      }
+      const [a, b] = slotRefs.current;
+      const fromSlot =
+        event.source && event.source === a?.contentWindow
+          ? 0
+          : event.source && event.source === b?.contentWindow
+            ? 1
+            : null;
+      const f = framesRef.current;
+      if (f.docs[f.front === 0 ? 1 : 0] !== null) {
+        // A message from the old front while newer code loads is stale.
+        if (fromSlot === f.front) return;
+        setFrames(promote);
+      }
       if (event.data.type === "uiforge-preview-error") {
         window.clearTimeout(timer);
         setTimedOut(false);
@@ -141,20 +201,38 @@ export function SandboxPreview({
             variant="outline"
             size="sm"
             className="text-xs"
-            onClick={() => setReloadKey((k) => k + 1)}
+            onClick={() => {
+              setFrames(initialFrames(srcDoc));
+              setReloadKey((k) => k + 1);
+            }}
           >
             <RotateCcw /> Recarregar preview
           </Button>
         </div>
       ) : null}
-      <iframe
-        key={reloadKey}
-        title="Live preview"
-        sandbox="allow-scripts"
-        srcDoc={srcDoc}
-        style={{ colorScheme: "light" }}
-        className="h-80 w-full max-w-full rounded-lg border border-border bg-white"
-      />
+      <div className="relative">
+        {([0, 1] as const).map((i) =>
+          frames.docs[i] === null ? null : (
+            <iframe
+              key={`${reloadKey}-${i}`}
+              ref={(el) => {
+                slotRefs.current[i] = el;
+              }}
+              title={i === frames.front ? "Live preview" : "Live preview (carregando)"}
+              aria-hidden={i === frames.front ? undefined : true}
+              tabIndex={i === frames.front ? undefined : -1}
+              sandbox="allow-scripts"
+              srcDoc={frames.docs[i] ?? undefined}
+              style={{ colorScheme: "light" }}
+              className={
+                i === frames.front
+                  ? "h-80 w-full max-w-full rounded-lg border border-border bg-white"
+                  : "pointer-events-none absolute inset-0 h-80 w-full max-w-full rounded-lg border border-border bg-white opacity-0"
+              }
+            />
+          ),
+        )}
+      </div>
     </section>
   );
 }
