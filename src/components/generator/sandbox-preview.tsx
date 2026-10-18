@@ -210,7 +210,7 @@ export function SandboxPreview({
           </Button>
         </div>
       ) : null}
-      <div className="relative">
+      <div className="relative flex-1">
         {([0, 1] as const).map((i) =>
           frames.docs[i] === null ? null : (
             <iframe
@@ -226,8 +226,8 @@ export function SandboxPreview({
               style={{ colorScheme: "light" }}
               className={
                 i === frames.front
-                  ? "h-80 w-full max-w-full rounded-lg border border-border bg-white"
-                  : "pointer-events-none absolute inset-0 h-80 w-full max-w-full rounded-lg border border-border bg-white opacity-0"
+                  ? "h-full min-h-80 w-full max-w-full rounded-lg border border-border bg-white"
+                  : "pointer-events-none absolute inset-0 h-full min-h-80 w-full max-w-full rounded-lg border border-border bg-white opacity-0"
               }
             />
           ),

@@ -6,6 +6,7 @@ import { FilePlus2, RotateCcw } from "lucide-react";
 import { CodeView } from "@/components/generator/code-view";
 import { DiscardDraftDialog } from "@/components/generator/discard-draft-dialog";
 import { NewComponentDialog } from "@/components/generator/new-component-dialog";
+import { PanelBoard } from "@/components/generator/panel-board";
 import { PromptForm } from "@/components/generator/prompt-form";
 import { SessionBar } from "@/components/generator/session-bar";
 import { TurnList } from "@/components/generator/turn-list";
@@ -13,6 +14,7 @@ import { useDebouncedDraft } from "@/components/generator/use-debounced-draft";
 import type { TurnTransient } from "@/components/generator/turn-list";
 import { useGeneratorSession } from "@/components/generator/use-generator-session";
 import { useSuggestions } from "@/components/generator/use-suggestions";
+import { useMediaQuery } from "@/components/generator/use-media-query";
 import { useUndoShortcut } from "@/components/generator/use-undo-shortcut";
 import { Button } from "@/components/ui/button";
 import {
@@ -69,6 +71,8 @@ export function GeneratorShell() {
   const later = laterRange(state);
 
   const [tab, setTab] = useState<Tab>("preview");
+  // Desktop: draggable cards. Phones (and the first render) keep the tabs.
+  const boardEnabled = useMediaQuery("(min-width: 768px)");
   const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({
     preview: null,
     code: null,
@@ -316,87 +320,175 @@ export function GeneratorShell() {
         : "text-muted-foreground",
     );
 
+  const promptPanel = (
+    <PromptForm
+      value={prompt}
+      onChange={setPrompt}
+      onSubmit={handleSubmit}
+      onStop={session.stop}
+      isLoading={busy}
+      mode={refineMode ? "refine" : "generate"}
+      chips={refineMode ? chips : null}
+      textareaRef={textareaRef}
+      baseNotice={refineMode ? baseNotice : null}
+      turnList={
+        refineMode ? (
+          <TurnList
+            versions={versions}
+            cursor={cursor}
+            droppedCount={state.droppedCount}
+            busy={busy}
+            transient={transient}
+            open={historyOpen}
+            onOpenChange={setHistoryOpen}
+            onRestore={handleRestore}
+            draftActive={dirty}
+          />
+        ) : null
+      }
+      sessionBar={
+        refineMode ? (
+          <SessionBar
+            number={n ?? 1}
+            total={versions.length}
+            canUndo={undoEnabled}
+            busy={busy}
+            onUndo={handleUndo}
+            onNew={requestNew}
+            newButtonRef={newBtnRef}
+          />
+        ) : null
+      }
+    />
+  );
+
+  const statusAndError = (
+    <>
+      <p
+        aria-live="polite"
+        aria-atomic="true"
+        className="min-h-5 text-sm text-muted-foreground"
+      >
+        {status}
+      </p>
+      {errorMessage ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2">
+          <p role="alert" className="text-sm text-destructive">
+            {errorMessage}
+          </p>
+          {error?.kind === "too_large" ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="text-xs"
+              onClick={requestNew}
+              disabled={busy}
+            >
+              <FilePlus2 /> Novo componente
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="text-xs"
+              onClick={() => void handleRetry()}
+              disabled={busy}
+            >
+              <RotateCcw /> Tentar de novo
+            </Button>
+          )}
+        </div>
+      ) : null}
+    </>
+  );
+
+  const previewPanel = (
+    committed ? (
+      <SandboxPreview
+        code={previewCode}
+        updating={!!pending}
+        // D-12: errors in a draft or a manual version are the user's code.
+        errorSource={
+          dirty || committed.source === "manual" ? "user" : "ai"
+        }
+        regenerateLabel="Tentar de novo"
+        // Mutually exclusive with the shell error banner's retry button.
+        // WR-01: omitted when regenerating would discard later versions
+        // or lacks a real base; refine and restore remain available.
+        // D-12: also omitted while a draft exists (canRegenerate is
+        // already false on a manual version).
+        onRegenerate={
+          error || !session.canRegenerate || dirty
+            ? undefined
+            : () => void session.regenerate()
+        }
+        regenerateDisabled={busy}
+      />
+    ) : pending ? (
+      <PreviewPlaceholder text="Gerando preview…" />
+    ) : (
+      <PreviewPlaceholder text="O preview aparece aqui depois de gerar." />
+    )
+  );
+
+  const codePanel = (
+    <CodeView
+      code={editorValue}
+      busy={busy}
+      scrollResetKey={scrollResetKey}
+      onChange={handleEditorChange}
+      readOnly={busy || !committed}
+      dirty={dirty}
+      onDiscard={handleDiscard}
+      historyKey={historyKey}
+    />
+  );
+
+  const dialogs = (
+    <>
+      <NewComponentDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        onConfirm={() => {
+          setConfirmOpen(false);
+          doReset();
+        }}
+        finalFocusRef={newBtnRef}
+        // Focus lands on the textarea via the dialog's finalFocus on confirm.
+        confirmFocusRef={textareaRef}
+      />
+      <DiscardDraftDialog
+        open={discardTarget !== null}
+        onOpenChange={(o) => {
+          if (!o) setDiscardTarget(null);
+        }}
+        onConfirm={confirmDiscard}
+        baseNumber={n ?? 1}
+        targetNumber={discardTarget?.number ?? 1}
+        finalFocusRef={restoreFocusRef}
+      />
+    </>
+  );
+
+  if (boardEnabled) {
+    return (
+      <>
+        <PanelBoard
+          toolbar={statusAndError}
+          panels={{ prompt: promptPanel, preview: previewPanel, code: codePanel }}
+        />
+        {dialogs}
+      </>
+    );
+  }
+
   return (
     <div className="grid min-h-0 min-w-0 flex-1 gap-4 md:grid-cols-2">
-      <div className="order-2 min-w-0 md:order-1">
-        <PromptForm
-          value={prompt}
-          onChange={setPrompt}
-          onSubmit={handleSubmit}
-          onStop={session.stop}
-          isLoading={busy}
-          mode={refineMode ? "refine" : "generate"}
-          chips={refineMode ? chips : null}
-          textareaRef={textareaRef}
-          baseNotice={refineMode ? baseNotice : null}
-          turnList={
-            refineMode ? (
-              <TurnList
-                versions={versions}
-                cursor={cursor}
-                droppedCount={state.droppedCount}
-                busy={busy}
-                transient={transient}
-                open={historyOpen}
-                onOpenChange={setHistoryOpen}
-                onRestore={handleRestore}
-                draftActive={dirty}
-              />
-            ) : null
-          }
-          sessionBar={
-            refineMode ? (
-              <SessionBar
-                number={n ?? 1}
-                total={versions.length}
-                canUndo={undoEnabled}
-                busy={busy}
-                onUndo={handleUndo}
-                onNew={requestNew}
-                newButtonRef={newBtnRef}
-              />
-            ) : null
-          }
-        />
-      </div>
+      <div className="order-2 min-w-0 md:order-1">{promptPanel}</div>
       <div className="order-1 flex min-h-64 min-w-0 flex-col gap-3 md:order-2">
-        <p
-          aria-live="polite"
-          aria-atomic="true"
-          className="min-h-5 text-sm text-muted-foreground"
-        >
-          {status}
-        </p>
-        {errorMessage ? (
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2">
-            <p role="alert" className="text-sm text-destructive">
-              {errorMessage}
-            </p>
-            {error?.kind === "too_large" ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="text-xs"
-                onClick={requestNew}
-                disabled={busy}
-              >
-                <FilePlus2 /> Novo componente
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="text-xs"
-                onClick={() => void handleRetry()}
-                disabled={busy}
-              >
-                <RotateCcw /> Tentar de novo
-              </Button>
-            )}
-          </div>
-        ) : null}
+        {statusAndError}
         <div
           role="tablist"
           aria-label="Resultado"
@@ -441,32 +533,7 @@ export function GeneratorShell() {
           aria-labelledby="tab-preview"
           className={cn("min-w-0", tab !== "preview" && "max-md:hidden")}
         >
-          {committed ? (
-            <SandboxPreview
-              code={previewCode}
-              updating={!!pending}
-              // D-12: errors in a draft or a manual version are the user's code.
-              errorSource={
-                dirty || committed.source === "manual" ? "user" : "ai"
-              }
-              regenerateLabel="Tentar de novo"
-              // Mutually exclusive with the shell error banner's retry button.
-              // WR-01: omitted when regenerating would discard later versions
-              // or lacks a real base; refine and restore remain available.
-              // D-12: also omitted while a draft exists (canRegenerate is
-              // already false on a manual version).
-              onRegenerate={
-                error || !session.canRegenerate || dirty
-                  ? undefined
-                  : () => void session.regenerate()
-              }
-              regenerateDisabled={busy}
-            />
-          ) : pending ? (
-            <PreviewPlaceholder text="Gerando preview…" />
-          ) : (
-            <PreviewPlaceholder text="O preview aparece aqui depois de gerar." />
-          )}
+          {previewPanel}
         </div>
         <div
           role="tabpanel"
@@ -474,39 +541,10 @@ export function GeneratorShell() {
           aria-labelledby="tab-code"
           className={cn("min-h-0 min-w-0 flex-1", tab !== "code" && "max-md:hidden")}
         >
-          <CodeView
-            code={editorValue}
-            busy={busy}
-            scrollResetKey={scrollResetKey}
-            onChange={handleEditorChange}
-            readOnly={busy || !committed}
-            dirty={dirty}
-            onDiscard={handleDiscard}
-            historyKey={historyKey}
-          />
+          {codePanel}
         </div>
       </div>
-      <NewComponentDialog
-        open={confirmOpen}
-        onOpenChange={setConfirmOpen}
-        onConfirm={() => {
-          setConfirmOpen(false);
-          doReset();
-        }}
-        finalFocusRef={newBtnRef}
-        // Focus lands on the textarea via the dialog's finalFocus on confirm.
-        confirmFocusRef={textareaRef}
-      />
-      <DiscardDraftDialog
-        open={discardTarget !== null}
-        onOpenChange={(o) => {
-          if (!o) setDiscardTarget(null);
-        }}
-        onConfirm={confirmDiscard}
-        baseNumber={n ?? 1}
-        targetNumber={discardTarget?.number ?? 1}
-        finalFocusRef={restoreFocusRef}
-      />
+      {dialogs}
     </div>
   );
 }
