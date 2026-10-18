@@ -288,11 +288,23 @@ describe("TurnList", () => {
 });
 
 describe("scrollIntoContainer", () => {
-  function setup(c: DOMRect, e: DOMRect, scrollTop: number) {
+  // Container metrics: border-box rect plus clientTop (border) and
+  // clientHeight (padding box height), like a laid-out element.
+  function setup(
+    c: DOMRect,
+    e: DOMRect,
+    scrollTop: number,
+    { border = 0, padding = 0 }: { border?: number; padding?: number } = {},
+  ) {
     const container = document.createElement("div");
     const el = document.createElement("div");
+    container.style.padding = `${padding}px`;
     container.getBoundingClientRect = () => c;
     el.getBoundingClientRect = () => e;
+    Object.defineProperty(container, "clientTop", { value: border });
+    Object.defineProperty(container, "clientHeight", {
+      value: c.bottom - c.top - 2 * border,
+    });
     container.scrollTop = scrollTop;
     return { container, el };
   }
@@ -300,18 +312,58 @@ describe("scrollIntoContainer", () => {
   it("scrolls down when the element is below the container", () => {
     const { container, el } = setup(rect(0, 100), rect(120, 152), 0);
     scrollIntoContainer(container, el);
-    expect(container.scrollTop).toBe(52);
+    // Keeps the 3px focus ring inside the scrollport.
+    expect(container.scrollTop).toBe(55);
   });
 
   it("scrolls up when the element is above the container", () => {
     const { container, el } = setup(rect(100, 200), rect(60, 92), 80);
     scrollIntoContainer(container, el);
-    expect(container.scrollTop).toBe(40);
+    expect(container.scrollTop).toBe(37);
   });
 
   it("leaves the scroll unchanged when the element is visible", () => {
     const { container, el } = setup(rect(0, 100), rect(20, 52), 30);
     scrollIntoContainer(container, el);
     expect(container.scrollTop).toBe(30);
+  });
+
+  it("aligns above to the padding box, not the border box (WR-03)", () => {
+    // 1px border + 4px padding (p-1): the item must land at 100 + 1 + 4.
+    const { container, el } = setup(rect(100, 200), rect(100, 132), 80, {
+      border: 1,
+      padding: 4,
+    });
+    scrollIntoContainer(container, el);
+    expect(container.scrollTop).toBe(75);
+  });
+
+  it("aligns below to the padding box, not the border box (WR-03)", () => {
+    // Inner bottom = 0 + 1 + 98 = 99; minus 4px padding = 95.
+    const { container, el } = setup(rect(0, 100), rect(68, 100), 0, {
+      border: 1,
+      padding: 4,
+    });
+    scrollIntoContainer(container, el);
+    expect(container.scrollTop).toBe(5);
+  });
+
+  it("treats an item inside the padding margin as visible", () => {
+    const { container, el } = setup(rect(0, 100), rect(5, 95), 10, {
+      border: 1,
+      padding: 4,
+    });
+    scrollIntoContainer(container, el);
+    expect(container.scrollTop).toBe(10);
+  });
+
+  it("does nothing when the container is not laid out", () => {
+    const container = document.createElement("div");
+    const el = document.createElement("div");
+    container.getBoundingClientRect = () => rect(0, 0);
+    el.getBoundingClientRect = () => rect(120, 152);
+    container.scrollTop = 7;
+    scrollIntoContainer(container, el);
+    expect(container.scrollTop).toBe(7);
   });
 });

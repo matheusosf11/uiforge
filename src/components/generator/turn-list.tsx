@@ -15,17 +15,37 @@ export type TurnTransient = {
 
 const REGION_ID = "turn-list-region";
 
+/** Width of the items' `focus-visible:ring-3` ring, in px. */
+const FOCUS_RING_PX = 3;
+
 /**
  * Scrolls only `container` so `el` is fully visible (block "nearest").
  * Never use scrollIntoView: it also scrolls the page.
+ *
+ * WR-03: measures against the scrollport (the padding box, inside the
+ * border) and keeps the container's padding, at least the focus ring's
+ * width, between `el` and the edge so the ring is never clipped.
  */
-export function scrollIntoContainer(container: HTMLElement, el: HTMLElement): void {
+export function scrollIntoContainer(
+  container: HTMLElement,
+  el: HTMLElement,
+  ringWidth = FOCUS_RING_PX,
+): void {
+  // Not laid out (e.g. the collapsed mobile disclosure): nothing to align.
+  if (container.clientHeight === 0) return;
   const c = container.getBoundingClientRect();
   const e = el.getBoundingClientRect();
-  if (e.top < c.top) {
-    container.scrollTop -= c.top - e.top;
-  } else if (e.bottom > c.bottom) {
-    container.scrollTop += e.bottom - c.bottom;
+  const style = window.getComputedStyle(container);
+  const padTop = parseFloat(style.paddingTop) || 0;
+  const padBottom = parseFloat(style.paddingBottom) || 0;
+  const innerTop = c.top + container.clientTop;
+  const top = innerTop + Math.max(padTop, ringWidth);
+  const bottom =
+    innerTop + container.clientHeight - Math.max(padBottom, ringWidth);
+  if (e.top < top) {
+    container.scrollTop -= top - e.top;
+  } else if (e.bottom > bottom) {
+    container.scrollTop += e.bottom - bottom;
   }
 }
 
