@@ -5,6 +5,8 @@ import {
   clientIp,
   getRateLimitConfig,
   getSuggestRateLimitConfig,
+  getDailyLimitConfig,
+  limitRequest,
 } from "./rate-limit";
 
 const cfg = { max: 5, windowMs: 60_000 };
@@ -148,5 +150,82 @@ describe("getSuggestRateLimitConfig", () => {
     vi.stubEnv("SUGGEST_RATE_LIMIT_MAX", "3");
     vi.stubEnv("SUGGEST_RATE_LIMIT_WINDOW_MS", "2000");
     expect(getSuggestRateLimitConfig()).toEqual({ max: 3, windowMs: 2000 });
+  });
+});
+
+describe("getDailyLimitConfig", () => {
+  it("defaults to 60 per day and reads DAILY_LIMIT_MAX", () => {
+    expect(getDailyLimitConfig()).toEqual({ max: 60, windowMs: 86_400_000 });
+    vi.stubEnv("DAILY_LIMIT_MAX", "7");
+    expect(getDailyLimitConfig().max).toBe(7);
+  });
+});
+
+describe("limitRequest", () => {
+  const minute = { scope: "minute" as const, config: { max: 2, windowMs: 60_000 } };
+  const day = { scope: "day" as const, config: { max: 3, windowMs: 86_400_000 } };
+
+  it("uses memory without Upstash and reports which bucket is full", async () => {
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "");
+    const fetchImpl = vi.fn();
+    const at = (now: number) => limitRequest("ip", [minute, day], { now, fetchImpl });
+    expect((await at(0)).ok).toBe(true);
+    expect((await at(1)).ok).toBe(true);
+    expect(await at(2)).toMatchObject({ ok: false, scope: "minute" });
+    expect((await at(120_000)).ok).toBe(true);
+    expect(await at(240_000)).toMatchObject({ ok: false, scope: "day" });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  describe("with Upstash", () => {
+    beforeEach(() => {
+      vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://redis.example/");
+      vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "tok");
+    });
+
+    const reply = (count: number) =>
+      new Response(JSON.stringify([{ result: count }, { result: 1 }]), { status: 200 });
+
+    it("counts in a shared fixed window with INCR + PEXPIRE NX", async () => {
+      const fetchImpl = vi.fn(async () => reply(1));
+      const r = await limitRequest("ip", [minute], {
+        now: 90_000,
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+      });
+      expect(r.ok).toBe(true);
+      const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+      expect(url).toBe("https://redis.example/pipeline");
+      expect((init.headers as Record<string, string>).authorization).toBe("Bearer tok");
+      expect(JSON.parse(init.body as string)).toEqual([
+        ["INCR", "uiforge:rl:ip:minute:60000"],
+        ["PEXPIRE", "uiforge:rl:ip:minute:60000", "60000", "NX"],
+      ]);
+    });
+
+    it("blocks above max until the window ends", async () => {
+      const fetchImpl = vi.fn(async () => reply(3));
+      const r = await limitRequest("ip", [minute], {
+        now: 90_000,
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+      });
+      expect(r).toEqual({ ok: false, retryAfterSec: 30, scope: "minute" });
+    });
+
+    it("falls back to memory when Redis fails or answers garbage", async () => {
+      const down = vi.fn(async () => {
+        throw new Error("network");
+      });
+      const garbage = vi.fn(async () => new Response("[]", { status: 200 }));
+      const opts = (fetchImpl: unknown, now: number) => ({
+        now,
+        fetchImpl: fetchImpl as typeof fetch,
+      });
+      expect((await limitRequest("ip", [minute], opts(down, 0))).ok).toBe(true);
+      expect((await limitRequest("ip", [minute], opts(garbage, 1))).ok).toBe(true);
+      expect(await limitRequest("ip", [minute], opts(down, 2))).toMatchObject({
+        ok: false,
+        scope: "minute",
+      });
+    });
   });
 });

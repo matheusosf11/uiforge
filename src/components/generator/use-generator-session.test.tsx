@@ -87,6 +87,28 @@ describe("useGeneratorSession", () => {
     expect(result.current.busy).toBe(false);
   });
 
+  it.each([
+    ["rate_limited", "minute"],
+    ["daily_limit", "day"],
+    ["quota_exhausted", "quota"],
+  ])("429 %s -> limit %s with Retry-After", async (body, limit) => {
+    const f = vi.fn(
+      async () =>
+        new Response(body, { status: 429, headers: { "Retry-After": "30" } }),
+    );
+    const { result } = renderHook(() =>
+      useGeneratorSession({ fetchImpl: f as unknown as typeof fetch }),
+    );
+    await act(async () => {
+      await result.current.send("x");
+    });
+    expect(result.current.state.error).toMatchObject({
+      kind: "rate_limit",
+      limit,
+      retryAfterSec: 30,
+    });
+  });
+
   it("stream error -> failed", async () => {
     const f = vi.fn(async () => {
       throw new Error("net");

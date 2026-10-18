@@ -12,11 +12,19 @@ import {
   committedVersion,
   initialSessionState,
   isBusy,
+  type LimitKind,
   sessionReducer,
   type SessionState,
   type Version,
 } from "@/lib/session";
 import { streamGenerate } from "@/lib/stream-generate";
+
+// Body text of a 429 from /api/generate (see route.ts).
+function limitKind(body: string): LimitKind {
+  if (body.includes("daily_limit")) return "day";
+  if (body.includes("quota_exhausted")) return "quota";
+  return "minute";
+}
 
 export type SendResult = "committed" | "failed" | "aborted" | "ignored";
 
@@ -86,7 +94,15 @@ export function useGeneratorSession(opts?: { fetchImpl?: typeof fetch }) {
         if (result.reason === "aborted") return "aborted";
         if (result.reason === "http") {
           if (result.status === 429) {
-            dispatch({ type: "FAIL", id, kind: "rate_limit" });
+            dispatch({
+              type: "FAIL",
+              id,
+              kind: "rate_limit",
+              limit: limitKind(result.body),
+              ...(result.retryAfterSec
+                ? { retryAfterSec: result.retryAfterSec }
+                : {}),
+            });
           } else if (
             result.status === 413 ||
             result.body.includes("code_too_large")

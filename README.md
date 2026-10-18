@@ -52,9 +52,11 @@ Get a free Gemini API key from [Google AI Studio](https://aistudio.google.com/ap
 Optional environment variables for the per-IP rate limits (each route has its own bucket):
 
 - `RATE_LIMIT_MAX` (default 5 requests) and `RATE_LIMIT_WINDOW_MS` (default 60000) for `/api/generate`
+- `DAILY_LIMIT_MAX` (default 60 generations per IP per day) for `/api/generate`, so one client or script cannot spend the whole free model quota
 - `SUGGEST_RATE_LIMIT_MAX` (default 10 requests) and `SUGGEST_RATE_LIMIT_WINDOW_MS` (default 60000) for `/api/suggest`
+- `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` (optional, server-only): when both are set, the limits are counted in Upstash Redis and shared by every serverless instance. Without them, or when Redis does not answer within 1 s, each instance falls back to its in-memory limiter. A free Upstash database is enough.
 
-Useful scripts: `npm test`, `npm run typecheck`, `npm run lint`, `npm run test:coverage`, `npm run e2e`, `npm run demo:gif` (records the demo GIF; requires `ffmpeg` on PATH).
+Useful scripts: `npm test`, `npm run typecheck`, `npm run lint`, `npm run test:coverage`, `npm run check:secrets` (after a build: no keys in the browser bundle or tracked files), `npm run e2e`, `npm run demo:gif` (records the demo GIF; requires `ffmpeg` on PATH).
 
 ## Architecture
 
@@ -89,7 +91,7 @@ Walk-through:
 
 ## API
 
-Both routes take JSON bodies, apply a per-IP rate limit and never expose provider error messages.
+Both routes take JSON bodies (`content-type: application/json`, otherwise `415`), refuse requests that a browser marks as coming from another site (`403` `forbidden`, from `Sec-Fetch-Site` or a mismatched `Origin`), apply a per-IP rate limit and never expose provider error messages.
 
 ### POST /api/generate
 
@@ -99,7 +101,7 @@ Both routes take JSON bodies, apply a per-IP rate limit and never expose provide
 - Errors:
   - `400` invalid body;
   - `413` `code_too_large` (code over 30,000 characters or a body over 256,000 bytes), checked before the rate limit so it costs no quota;
-  - `429` `rate_limited` with a `Retry-After` header (in seconds); the provider's own quota errors are also reported as `429`;
+  - `429` with a `Retry-After` header (in seconds) and a body that says which limit was hit: `rate_limited` (per minute), `daily_limit` (per day) or `quota_exhausted` (the provider's own free quota). The client turns each into a friendly pt-BR message (for example "Aguarde 42 segundos e tente de novo"), never a technical error;
   - `500` missing API key;
   - `502` `generate_failed` when every model fails before the first byte. Failures after the first byte error the stream.
 
@@ -107,6 +109,7 @@ Both routes take JSON bodies, apply a per-IP rate limit and never expose provide
 
 - Request: `{ "code": string }`, non-blank, at most 30,000 characters.
 - Response: `200` with `{ "suggestions": [{ "label": string, "instruction": string }] }`: at most 4 suggestions, labels up to 30 characters and instructions up to 300.
+- Cache: the answer for the same code is kept in the instance's memory (up to 200 entries), so undo/redo and repeated versions cost no model call and no quota.
 - Rate limit: its own bucket, separate from generate (`SUGGEST_RATE_LIMIT_MAX`, default 10, per `SUGGEST_RATE_LIMIT_WINDOW_MS`, default 60000).
 - Timeouts: the server tries `gemini-3.5-flash-lite`, then `gemini-3.6-flash`, each capped at 5 s, inside a 9 s total budget. The client waits up to 12 s (the budget plus 3 s of headroom).
 - Errors: `400`, `413` `code_too_large`, `429` with `Retry-After`, `500` missing key, `502` `suggest_failed`.
@@ -129,14 +132,14 @@ What it does NOT protect against (residual risks):
 - Outbound network: scripts in the iframe can still make requests (for example to exfiltrate what the user types into the generated UI).
 - Deceptive UI: generated markup can look like a login form or other phishing-style content inside the preview frame.
 - Supply chain of the preview runtime: Tailwind, React and Babel are pinned files vendored in `public/preview-runtime` and served from the app's own origin, without Subresource Integrity hashes.
-- The host's message listener does not verify the sender window; the worst a spoofed message can do is show a text error line.
+- The host's message listener only accepts messages whose `source` is one of its own preview frames and whose origin is the sandbox's opaque `"null"`; anything else (another tab, an extension, the page itself) is ignored.
 
 ## Trade-offs
 
 - Gemini free tier: no cost, but limited quota and latency; the model ids live in one file so they can be swapped, and a fallback chain absorbs "high demand" errors.
 - srcdoc iframe instead of Sandpack: Sandpack was used first and removed. A hand-built srcdoc keeps the sandbox attribute and the origin model explicit and drops a heavy dependency, at the cost of loading the runtime scripts on every preview.
 - Refine returns the whole file, not a diff: simpler and robust to small model mistakes, but long components use more tokens per turn. The 30,000-character limit on `currentCode` bounds this.
-- Rate limiting is in memory and best-effort: counters live in one serverless instance, are not shared between instances and reset on cold starts. A distributed limiter (PLAT-01, for example Upstash) is the real fix and is left for v2.
+- Rate limiting: with Upstash configured the counters are shared (fixed windows, one `INCR` + `PEXPIRE NX` pipeline per bucket). Without it, or when Redis is down, counters live in one serverless instance and reset on cold starts. The origin check and the JSON-only rule stop other sites and naive scripts, but a determined client can forge headers; the per-IP minute and daily limits are what bound the cost.
 - Self-hosted caveat: the per-IP key only trusts forwarded headers (`x-vercel-forwarded-for`, `x-real-ip`, `x-forwarded-for`) when `VERCEL` is set; elsewhere all clients share one bucket, so put a trusted proxy or a real limiter in front.
 - Mock model in e2e: tests are deterministic, free and keyless, but they do not exercise the real provider. The switch is an env var only and is ignored on Vercel Production.
 - Dark host, light preview: the site is dark-only, but generated components usually assume a white background, so the iframe stays light.
@@ -150,7 +153,7 @@ What it does NOT protect against (residual risks):
   - smokes in `e2e/generate.spec.ts`: happy path, mid-stream error with retry, copy and download, mobile tabs, refine and undo, failed refine, restoring an earlier version, editing the code (preview, refine uses the edit, copy exports it, Esc then Tab);
   - `e2e/journey.spec.ts`: one serial test of the full loop (generate, refine, undo, manual edit, refine after the edit, failed refine that keeps the previous version).
 - The e2e server port is `E2E_PORT` (default 3100), for machines where that port is taken.
-- CI (GitHub Actions) runs two jobs: `check` (lint, typecheck, coverage, build) and `e2e` (Playwright). Coverage is reported without a threshold.
+- CI (GitHub Actions) runs two jobs: `check` (lint, typecheck, coverage, build) and `e2e` (Playwright). Coverage has a minimum in `vitest.config.ts` (statements 75%, branches 78%, functions 74%, lines 77%) and the build fails below it. After the build, `npm run check:secrets` fails if a Google API key, a private key or the value of a server-only variable appears in `.next/static` or in a tracked file.
 - Docs assets are regenerated on demand and their specs are skipped otherwise:
   - `SCREENSHOTS=1 npx playwright test e2e/screenshots.spec.ts` captures `docs/screenshot-dark.png` (dark only);
   - `npm run demo:gif` runs `e2e/demo.spec.ts` with `DEMO=1` (video at 1600x900) and converts it with a two-pass ffmpeg palette into `docs/demo.gif` (about 960px wide, at most 3 MB). It requires `ffmpeg` on PATH. `npm run demo:gif -- --convert-only` reconverts the last recording, and `DEMO_GIF_SPEED`, `DEMO_GIF_FLOOR`, `DEMO_GIF_START` and `DEMO_GIF_MAX` tune the conversion.
@@ -169,7 +172,6 @@ Shipped in v1.1: iterative refinement, version history and editable code.
 - Authentication and per-user quotas
 - Persistent sessions (versions survive a reload)
 - Diff view between versions
-- Distributed rate limiting (PLAT-01)
 - Multi-file components
 - Model selector
 

@@ -5,6 +5,18 @@ import {
   SandboxPreview,
 } from "@/components/generator/sandbox-preview";
 
+// Posts as the preview frame with that title (as the sandboxed runtime does).
+function post(data: unknown, title = "Live preview") {
+  const frame = screen.getByTitle(title) as HTMLIFrameElement;
+  window.dispatchEvent(
+    new MessageEvent("message", {
+      data,
+      origin: "null",
+      source: frame.contentWindow,
+    }),
+  );
+}
+
 describe("SandboxPreview", () => {
   it("keeps the iframe sandbox at allow-scripts only and always light", () => {
     render(<SandboxPreview code="export default function A(){return <div/>}" />);
@@ -23,11 +35,7 @@ describe("SandboxPreview", () => {
       />,
     );
     act(() => {
-      window.dispatchEvent(
-        new MessageEvent("message", {
-          data: { type: "uiforge-preview-error", message: "Unexpected token (28:12)" },
-        }),
-      );
+      post({ type: "uiforge-preview-error", message: "Unexpected token (28:12)" });
     });
     const alert = screen.getByRole("alert");
     expect(alert).toHaveTextContent("A IA gerou um código com erro");
@@ -75,9 +83,7 @@ describe("SandboxPreview", () => {
     expect(back.getAttribute("srcdoc")).not.toBe(oldDoc);
 
     act(() => {
-      window.dispatchEvent(
-        new MessageEvent("message", { data: { type: "uiforge-preview-ready" } }),
-      );
+      post({ type: "uiforge-preview-ready" }, "Live preview (carregando)");
     });
     // Promoted without remounting; the old iframe is gone.
     expect(screen.getByTitle("Live preview")).toBe(back);
@@ -94,11 +100,7 @@ describe("SandboxPreview", () => {
       />,
     );
     act(() => {
-      window.dispatchEvent(
-        new MessageEvent("message", {
-          data: { type: "uiforge-preview-error", message: "boom" },
-        }),
-      );
+      post({ type: "uiforge-preview-error", message: "boom" });
     });
     expect(screen.getByRole("button", { name: /Tentar de novo/ })).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Gerar de novo/ })).toBeNull();
@@ -108,11 +110,7 @@ describe("SandboxPreview", () => {
     const valid = "export default function A(){return <div/>}";
     function postError(message = "boom") {
       act(() => {
-        window.dispatchEvent(
-          new MessageEvent("message", {
-            data: { type: "uiforge-preview-error", message },
-          }),
-        );
+        post({ type: "uiforge-preview-error", message });
       });
     }
 
@@ -161,6 +159,33 @@ describe("SandboxPreview", () => {
     });
   });
 
+  it("ignores messages from other windows or origins", () => {
+    render(<SandboxPreview code="export default function A(){return <div/>}" />);
+    const frame = screen.getByTitle("Live preview") as HTMLIFrameElement;
+    act(() => {
+      // Same window (e.g. a script on the page) and a foreign origin.
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          data: { type: "uiforge-preview-error", message: "spoof" },
+          origin: "null",
+          source: window,
+        }),
+      );
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          data: { type: "uiforge-preview-error", message: "spoof" },
+          origin: "https://evil.example",
+          source: frame.contentWindow,
+        }),
+      );
+    });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    act(() => {
+      post({ type: "uiforge-preview-error", message: "real" });
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent("real");
+  });
+
   describe("load timeout", () => {
     beforeEach(() => vi.useFakeTimers());
     afterEach(() => vi.useRealTimers());
@@ -184,9 +209,7 @@ describe("SandboxPreview", () => {
     it("stays quiet when the preview reports ready in time", () => {
       render(<SandboxPreview code="export default function A(){return <div/>}" />);
       act(() => {
-        window.dispatchEvent(
-          new MessageEvent("message", { data: { type: "uiforge-preview-ready" } }),
-        );
+        post({ type: "uiforge-preview-ready" });
         vi.advanceTimersByTime(PREVIEW_LOAD_TIMEOUT_MS * 2);
       });
       expect(screen.queryByRole("alert")).not.toBeInTheDocument();

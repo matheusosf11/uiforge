@@ -19,7 +19,7 @@ import { useUndoShortcut } from "@/components/generator/use-undo-shortcut";
 import { Button } from "@/components/ui/button";
 import {
   CODE_TOO_LARGE_MESSAGE,
-  friendlyGenerateError,
+  rateLimitMessage,
   GENERIC_ERROR_MESSAGE,
   REFINE_ERROR_MESSAGE,
 } from "@/lib/generate-error";
@@ -234,7 +234,7 @@ export function GeneratorShell() {
   if (error) {
     if (error.kind === "too_large") errorMessage = CODE_TOO_LARGE_MESSAGE;
     else if (error.kind === "rate_limit")
-      errorMessage = friendlyGenerateError(new Error("rate_limited"));
+      errorMessage = rateLimitMessage(error.limit, error.retryAfterSec);
     else
       errorMessage =
         error.baseId !== null ? REFINE_ERROR_MESSAGE : GENERIC_ERROR_MESSAGE;

@@ -3,7 +3,13 @@ import type { PromptImage } from "@/lib/prompt-image";
 export type StreamResult =
   | { ok: true; text: string }
   | { ok: false; reason: "aborted" }
-  | { ok: false; reason: "http"; status: number; body: string }
+  | {
+      ok: false;
+      reason: "http";
+      status: number;
+      body: string;
+      retryAfterSec?: number;
+    }
   | { ok: false; reason: "stream"; error: unknown };
 
 function isAbortError(err: unknown): boolean {
@@ -54,7 +60,16 @@ export async function streamGenerate(
       } catch {
         // body unreadable; status is what matters
       }
-      return { ok: false, reason: "http", status: res.status, body: text };
+      const retryAfter = Number(res.headers?.get("retry-after"));
+      return {
+        ok: false,
+        reason: "http",
+        status: res.status,
+        body: text,
+        ...(Number.isFinite(retryAfter) && retryAfter > 0
+          ? { retryAfterSec: Math.ceil(retryAfter) }
+          : {}),
+      };
     }
 
     if (!res.body) {

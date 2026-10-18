@@ -65,7 +65,7 @@ function req(body: unknown, headers?: Record<string, string>) {
   return new Request("http://localhost/api/generate", {
     method: "POST",
     body: JSON.stringify(body),
-    headers,
+    headers: { "content-type": "application/json", ...headers },
   });
 }
 
@@ -95,7 +95,7 @@ describe("POST /api/generate", () => {
     state.parts = [{ type: "start" }, { type: "error", error: api429() }];
     const res = await POST(req({ prompt: "x" }));
     expect(res.status).toBe(429);
-    expect(await res.text()).toBe("rate_limited");
+    expect(await res.text()).toBe("quota_exhausted");
   });
 
   it("outro erro vira 502", async () => {
@@ -190,6 +190,45 @@ describe("POST /api/generate", () => {
     expect(other.status).not.toBe(429);
   });
 
+  it("limite diario por IP responde daily_limit", async () => {
+    vi.stubEnv("RATE_LIMIT_MAX", "100");
+    vi.stubEnv("DAILY_LIMIT_MAX", "2");
+    const h = { "x-forwarded-for": "4.4.4.4" };
+    for (let i = 0; i < 2; i++) {
+      state.parts = [{ type: "text-delta", text: "a" }];
+      const ok = await POST(req({ prompt: "x" }, h));
+      expect(ok.status).toBe(200);
+      await ok.text();
+    }
+    const res = await POST(req({ prompt: "x" }, h));
+    expect(res.status).toBe(429);
+    expect(await res.text()).toBe("daily_limit");
+    expect(Number(res.headers.get("Retry-After"))).toBeGreaterThan(60);
+  });
+
+  it("recusa outros sites (403) e corpos que nao sao JSON (415) sem chamar o modelo", async () => {
+    const cross = await POST(
+      req({ prompt: "x" }, { origin: "https://evil.example", host: "localhost" }),
+    );
+    expect(cross.status).toBe(403);
+    const fetchSite = await POST(req({ prompt: "x" }, { "sec-fetch-site": "cross-site" }));
+    expect(fetchSite.status).toBe(403);
+    const form = await POST(
+      new Request("http://localhost/api/generate", { method: "POST", body: "prompt=x" }),
+    );
+    expect(form.status).toBe(415);
+    expect(vi.mocked(streamText)).not.toHaveBeenCalled();
+  });
+
+  it("aceita o proprio site como origem", async () => {
+    state.parts = [{ type: "text-delta", text: "ok" }];
+    const res = await POST(
+      req({ prompt: "x" }, { origin: "http://localhost", "sec-fetch-site": "same-origin" }),
+    );
+    expect(res.status).toBe(200);
+    await res.text();
+  });
+
   it("limite roda depois da validacao (400 nao consome)", async () => {
     const h = { "x-forwarded-for": "9.9.9.9" };
     for (let i = 0; i < 10; i++) {
@@ -227,7 +266,7 @@ describe("POST /api/generate", () => {
     ];
     const res = await POST(req({ prompt: "x" }));
     expect(res.status).toBe(429);
-    expect(await res.text()).toBe("rate_limited");
+    expect(await res.text()).toBe("quota_exhausted");
   });
 
   it("usa no maximo 1 retry do SDK por modelo", async () => {
@@ -307,7 +346,10 @@ describe("POST /api/generate", () => {
         new Request("http://localhost/api/generate", {
           method: "POST",
           body: raw,
-          headers: { "content-length": String(Buffer.byteLength(raw)) },
+          headers: {
+            "content-type": "application/json",
+            "content-length": String(Buffer.byteLength(raw)),
+          },
         }),
       );
       expect(res.status).toBe(200);
@@ -327,6 +369,7 @@ describe("POST /api/generate", () => {
           new Request("http://localhost/api/generate", {
             method: "POST",
             body: stream,
+            headers: { "content-type": "application/json" },
             duplex: "half",
           } as RequestInit),
         );
@@ -344,7 +387,11 @@ describe("POST /api/generate", () => {
 
     it("JSON invalido continua 400", async () => {
       const res = await POST(
-        new Request("http://localhost/api/generate", { method: "POST", body: "{nope" }),
+        new Request("http://localhost/api/generate", {
+          method: "POST",
+          body: "{nope",
+          headers: { "content-type": "application/json" },
+        }),
       );
       expect(res.status).toBe(400);
     });

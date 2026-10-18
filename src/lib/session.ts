@@ -12,10 +12,16 @@ export type Version = {
 
 export type SessionErrorKind = "failed" | "rate_limit" | "invalid" | "too_large";
 
+// Which limit a rate_limit error hit: this app's per-minute or daily limit,
+// or the AI provider's own free quota.
+export type LimitKind = "minute" | "day" | "quota";
+
 export type SessionError = {
   kind: SessionErrorKind;
   instruction: string;
   baseId: number | null;
+  limit?: LimitKind;
+  retryAfterSec?: number;
 };
 
 export type Pending = {
@@ -54,7 +60,13 @@ export type SessionAction =
   | { type: "START"; id: number; instruction: string; baseId?: number | null }
   | { type: "CHUNK"; id: number; text: string }
   | { type: "COMMIT"; id: number; raw: string }
-  | { type: "FAIL"; id: number; kind: "failed" | "rate_limit" | "too_large" }
+  | {
+      type: "FAIL";
+      id: number;
+      kind: "failed" | "rate_limit" | "too_large";
+      limit?: LimitKind;
+      retryAfterSec?: number;
+    }
   | { type: "ABORT"; id: number }
   | { type: "REJECT"; kind: "too_large"; instruction: string }
   | { type: "UNDO" }
@@ -270,6 +282,8 @@ export function sessionReducer(
           kind: action.kind,
           instruction: pending.instruction,
           baseId: pending.baseId,
+          ...(action.limit ? { limit: action.limit } : {}),
+          ...(action.retryAfterSec ? { retryAfterSec: action.retryAfterSec } : {}),
         },
         notice: null,
         savedManualId: null,

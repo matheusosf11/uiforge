@@ -7,6 +7,9 @@ import {
   REFINE_ERROR_MESSAGE,
   GENERIC_ERROR_MESSAGE,
   RATE_LIMIT_MESSAGE,
+  DAILY_LIMIT_MESSAGE,
+  QUOTA_MESSAGE,
+  rateLimitMessage,
 } from "./generate-error";
 
 const api429 = () =>
@@ -60,5 +63,25 @@ describe("friendlyGenerateError", () => {
     expect(CODE_TOO_LARGE_MESSAGE).toBe(
       "O componente ficou grande demais para refinar. Comece um Novo componente.",
     );
+  });
+});
+
+describe("rateLimitMessage", () => {
+  it("diz quanto esperar no limite por minuto", () => {
+    expect(rateLimitMessage("minute", 42)).toBe(
+      "Você fez muitos pedidos seguidos. Aguarde 42 segundos e tente de novo.",
+    );
+    expect(rateLimitMessage("minute", 1)).toContain("Aguarde 1 segundo ");
+    expect(rateLimitMessage("minute", 600)).toContain("Aguarde 10 minutos");
+  });
+  it("sem Retry-After usa a frase padrao", () => {
+    expect(rateLimitMessage()).toBe(RATE_LIMIT_MESSAGE);
+    expect(rateLimitMessage("minute")).toBe(RATE_LIMIT_MESSAGE);
+  });
+  it("limite diario e cota da IA tem frases proprias", () => {
+    expect(rateLimitMessage("day", 3600)).toBe(DAILY_LIMIT_MESSAGE);
+    expect(DAILY_LIMIT_MESSAGE).toMatch(/gerações gratuitas de hoje/);
+    expect(rateLimitMessage("quota")).toBe(QUOTA_MESSAGE);
+    expect(QUOTA_MESSAGE).toMatch(/limite gratuito da IA/);
   });
 });

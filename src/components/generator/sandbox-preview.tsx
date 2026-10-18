@@ -21,6 +21,11 @@ type Frames = {
   latest: string;
 };
 
+// Sandboxed srcdoc frames have an opaque origin, serialized as "null".
+export function isPreviewOrigin(origin: string): boolean {
+  return origin === "null";
+}
+
 function initialFrames(srcDoc: string): Frames {
   return { front: 0, docs: [srcDoc, null], latest: srcDoc };
 }
@@ -101,6 +106,10 @@ export function SandboxPreview({
           : event.source && event.source === b?.contentWindow
             ? 1
             : null;
+      // Only our own preview frames may report: any other window (another
+      // tab, an extension, a nested frame) is ignored. The frames are
+      // sandboxed without allow-same-origin, so their origin is "null".
+      if (fromSlot === null || !isPreviewOrigin(event.origin)) return;
       const f = framesRef.current;
       if (f.docs[f.front === 0 ? 1 : 0] !== null) {
         // A message from the old front while newer code loads is stale.

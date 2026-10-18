@@ -19,6 +19,15 @@ export default defineConfig({
       reporter: ["text", "html", "lcov"],
       include: ["src/**/*.{ts,tsx}"],
       exclude: ["src/**/*.test.*", "src/components/ui/**"],
+      // CI floor (npm run test:coverage): a little under the current numbers
+      // so a change that drops coverage noticeably fails the build. Raise it
+      // as coverage grows; never lower it to make a change pass.
+      thresholds: {
+        statements: 75,
+        branches: 78,
+        functions: 74,
+        lines: 77,
+      },
     },
   },
 });

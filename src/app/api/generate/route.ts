@@ -9,7 +9,13 @@ import {
   MAX_IMAGES,
 } from "@/lib/prompt-image";
 import { MAX_CODE_LENGTH, MAX_PROMPT_LENGTH } from "@/lib/prompt-limits";
-import { checkRateLimit, clientIp, getRateLimitConfig } from "@/lib/rate-limit";
+import {
+  clientIp,
+  getDailyLimitConfig,
+  getRateLimitConfig,
+  limitRequest,
+} from "@/lib/rate-limit";
+import { isForeignOrigin, isJsonRequest } from "@/lib/request-guard";
 
 export const runtime = "nodejs";
 export const maxDuration = 60; // Vercel Hobby allows up to 300; prevents stream truncation (P5)
@@ -49,6 +55,15 @@ const Body = z.object({
 });
 
 export async function POST(req: Request) {
+  // Only this app's own page may spend the model quota (see request-guard).
+  if (isForeignOrigin(req)) {
+    return new Response("forbidden", { status: 403 });
+  }
+  if (!isJsonRequest(req)) {
+    return new Response("Invalid request: expected application/json.", {
+      status: 415,
+    });
+  }
   // Fast reject on a declared length; absent/invalid/lying headers are caught
   // by the byte check on the actual body below.
   const header = req.headers.get("content-length");
@@ -83,9 +98,12 @@ export async function POST(req: Request) {
     return new Response("code_too_large", { status: 413 });
   }
   const mode: Mode = currentCode ? "edit" : "generate";
-  const limit = checkRateLimit(clientIp(req), getRateLimitConfig());
+  const limit = await limitRequest(clientIp(req), [
+    { scope: "minute", config: getRateLimitConfig() },
+    { scope: "day", config: getDailyLimitConfig() },
+  ]);
   if (!limit.ok) {
-    return new Response("rate_limited", {
+    return new Response(limit.scope === "day" ? "daily_limit" : "rate_limited", {
       status: 429,
       headers: { "Retry-After": String(limit.retryAfterSec) },
     });
@@ -278,6 +296,6 @@ async function openStream(
 
 function failureResponse(error: unknown) {
   return isRateLimitError(error)
-    ? new Response("rate_limited", { status: 429 })
+    ? new Response("quota_exhausted", { status: 429 })
     : new Response("generate_failed", { status: 502 });
 }

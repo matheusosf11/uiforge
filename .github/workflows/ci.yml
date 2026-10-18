@@ -26,6 +26,8 @@ jobs:
       - run: npm run typecheck
       - run: npm run test:coverage
       - run: npm run build
+      - name: No secrets in the browser bundle or the repo
+        run: npm run check:secrets
       - uses: actions/upload-artifact@v7
         if: always()
         with:

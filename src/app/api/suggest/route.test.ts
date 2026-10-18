@@ -4,6 +4,7 @@ import { generateText } from "ai";
 import { __resetRateLimit, checkRateLimit } from "@/lib/rate-limit";
 import { MAX_CODE_LENGTH } from "@/lib/prompt-limits";
 import { MOCK_SUGGESTIONS } from "@/lib/suggest";
+import { __resetSuggestCache } from "@/lib/suggest-cache";
 
 vi.mock("ai", async () => {
   const actual = await vi.importActual<typeof import("ai")>("ai");
@@ -22,7 +23,7 @@ const gen = vi.mocked(generateText) as unknown as ReturnType<typeof vi.fn>;
 const req = (body: unknown, raw?: string, headers: Record<string, string> = {}) =>
   new Request("http://localhost/api/suggest", {
     method: "POST",
-    headers,
+    headers: { "content-type": "application/json", ...headers },
     body: raw ?? JSON.stringify(body),
   });
 
@@ -31,6 +32,7 @@ const ok = (suggestions: unknown) => ({ output: { suggestions } });
 let info: ReturnType<typeof vi.spyOn>;
 beforeEach(() => {
   __resetRateLimit();
+  __resetSuggestCache();
   vi.unstubAllEnvs();
   vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY", "test-key");
   vi.stubEnv("SUGGEST_RATE_LIMIT_MAX", "3");
@@ -69,13 +71,35 @@ describe("POST /api/suggest", () => {
   it("429 with Retry-After after max requests, in its own bucket", async () => {
     gen.mockResolvedValue(ok([{ label: "A", instruction: "a" }]));
     for (let i = 0; i < 3; i++) {
-      expect((await POST(req({ code: "c" }))).status).toBe(200);
+      expect((await POST(req({ code: `c${i}` }))).status).toBe(200);
     }
-    const res = await POST(req({ code: "c" }));
+    const res = await POST(req({ code: "c9" }));
     expect(res.status).toBe(429);
     expect(res.headers.get("Retry-After")).toBeTruthy();
-    // The generate bucket (plain ip key) is untouched by the suggest bucket.
-    expect(checkRateLimit("unknown", { max: 1, windowMs: 60_000 }).ok).toBe(true);
+    // The generate bucket is untouched by the suggest bucket.
+    expect(checkRateLimit("unknown:minute", { max: 1, windowMs: 60_000 }).ok).toBe(true);
+  });
+
+  it("answers repeated code from the cache without the model or the limit", async () => {
+    gen.mockResolvedValue(ok([{ label: "A", instruction: "a" }]));
+    for (let i = 0; i < 6; i++) {
+      const res = await POST(req({ code: "same" }));
+      expect(res.status).toBe(200);
+      expect((await res.json()).suggestions[0].label).toBe("A");
+    }
+    expect(gen).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses other sites and non-JSON bodies", async () => {
+    const cross = await POST(
+      req({ code: "c" }, undefined, { origin: "https://evil.example", host: "localhost" }),
+    );
+    expect(cross.status).toBe(403);
+    const form = await POST(
+      new Request("http://localhost/api/suggest", { method: "POST", body: "code=c" }),
+    );
+    expect(form.status).toBe(415);
+    expect(gen).not.toHaveBeenCalled();
   });
 
   it("mock mode returns deterministic suggestions without key or model call", async () => {

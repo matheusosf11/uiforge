@@ -100,6 +100,23 @@ describe("streamGenerate", () => {
     expect(r).toEqual({ ok: false, reason: "http", status, body: "err-body" });
   });
 
+  it("passes Retry-After along with a 429", async () => {
+    const fetchImpl = fetchOf(
+      new Response("rate_limited", { status: 429, headers: { "Retry-After": "42" } }),
+    );
+    const r = await streamGenerate(
+      { prompt: "p" },
+      { signal: new AbortController().signal, onText: () => {}, fetchImpl },
+    );
+    expect(r).toEqual({
+      ok: false,
+      reason: "http",
+      status: 429,
+      body: "rate_limited",
+      retryAfterSec: 42,
+    });
+  });
+
   it("fetch AbortError -> aborted", async () => {
     const err = new DOMException("x", "AbortError");
     const r = await streamGenerate(

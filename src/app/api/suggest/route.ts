@@ -3,11 +3,9 @@ import { z } from "zod";
 import { getSuggestModels, isE2EMock } from "@/lib/ai/model";
 import { buildSuggestSystem, buildSuggestUser } from "@/lib/ai/suggest-prompt";
 import { MAX_CODE_LENGTH } from "@/lib/prompt-limits";
-import {
-  checkRateLimit,
-  clientIp,
-  getSuggestRateLimitConfig,
-} from "@/lib/rate-limit";
+import { clientIp, getSuggestRateLimitConfig, limitRequest } from "@/lib/rate-limit";
+import { isForeignOrigin, isJsonRequest } from "@/lib/request-guard";
+import { cacheKey, cachedSuggestions, rememberSuggestions } from "@/lib/suggest-cache";
 import {
   MOCK_SUGGESTIONS,
   sanitizeSuggestions,
@@ -39,6 +37,14 @@ const Schema = z.object({
 });
 
 export async function POST(req: Request) {
+  if (isForeignOrigin(req)) {
+    return new Response("forbidden", { status: 403 });
+  }
+  if (!isJsonRequest(req)) {
+    return new Response("Invalid request: expected application/json.", {
+      status: 415,
+    });
+  }
   const header = req.headers.get("content-length");
   const declared = header === null || header.trim() === "" ? NaN : Number(header);
   if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
@@ -67,7 +73,12 @@ export async function POST(req: Request) {
   if (code.length > MAX_CODE_LENGTH) {
     return new Response("code_too_large", { status: 413 });
   }
-  const limit = checkRateLimit(`suggest:${clientIp(req)}`, getSuggestRateLimitConfig());
+  const key = cacheKey(code);
+  const cached = isE2EMock() ? undefined : cachedSuggestions(key);
+  if (cached) return Response.json({ suggestions: cached });
+  const limit = await limitRequest(`suggest:${clientIp(req)}`, [
+    { scope: "minute", config: getSuggestRateLimitConfig() },
+  ]);
   if (!limit.ok) {
     return new Response("rate_limited", {
       status: 429,
@@ -116,6 +127,7 @@ export async function POST(req: Request) {
           count: suggestions.length,
         }),
       );
+      rememberSuggestions(key, suggestions);
       return Response.json({ suggestions });
     } catch {
       // Try the next model; provider messages are never exposed.
