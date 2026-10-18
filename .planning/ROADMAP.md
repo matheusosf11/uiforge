@@ -91,7 +91,7 @@ Plans:
 Plans:
 - [x] 08-01-PLAN.md — Reducer COMMIT_MANUAL + savedManualId + canRegenerate source rule; hook eager commitManual, draft-aware send/undo/restore/retry
 - [x] 08-02-PLAN.md — Install react-simple-code-editor 0.14.1; CodeView editor host (a11y, exit mode, read-only lock, history reset, export); fix tests broken by the editor
-- [ ] 08-03-PLAN.md — SandboxPreview errorSource copy; turn list "rascunho" row + clickable current item; DiscardDraftDialog (D-09)
+- [x] 08-03-PLAN.md — SandboxPreview errorSource copy; turn list "rascunho" row + clickable current item; DiscardDraftDialog (D-09)
 - [ ] 08-04-PLAN.md — Shell draft wiring: editable CodeView, 500 ms debounced preview, badge/discard/draft row, regenerate gating, export of the draft
 - [ ] 08-05-PLAN.md — Shell commit-before-action: refine/undo/restore/retry with draft, D-09 dialog, Novo componente rule, composite status
 - [ ] 08-06-PLAN.md — E2E edit smoke + single guarded Playwright run and phase gate
@@ -118,5 +118,5 @@ Plans:
 | 5. Refine API Contract & Edit Prompt | v1.1 | 2/2 | Complete    | 2026-10-17 |
 | 6. Session Core & Refine Loop | v1.1 | 7/7 | Complete    | 2026-10-18 |
 | 7. Turn List & Version Navigation | v1.1 | 5/5 | Complete    | 2026-10-18 |
-| 8. Editable Code View | v1.1 | 2/6 | In Progress|  |
+| 8. Editable Code View | v1.1 | 3/6 | In Progress|  |
 | 9. E2E, Demo GIF & Docs | v1.1 | 0/0 | Not started | - |
