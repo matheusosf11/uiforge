@@ -1209,6 +1209,42 @@ describe("draft commit before actions", () => {
     expect(editor()).toHaveValue(V1 + MARK);
   });
 
+  it("restoring the oldest version at the cap with a draft asks first (WR-01)", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await generateFirst(user);
+    await screen.findByText("Pronto — v1");
+    for (let i = 2; i <= 20; i++) {
+      await refine(user, `r${i}`);
+      await screen.findByText(`Pronto — v${i}`);
+    }
+    await typeAtEnd(user, MARK);
+
+    const v1Name = /^Restaurar v1: um card\./;
+    await user.click(within(list()).getByRole("button", { name: v1Name }));
+    let dialog = await screen.findByRole("alertdialog");
+    expect(
+      within(dialog).getByText(
+        "Você tem edições na v20. Ir para a v1 descarta essas edições.",
+      ),
+    ).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(screen.getByText("Editado", { exact: true })).toBeInTheDocument();
+    expect(screen.getByText("v20 · 20 versões")).toBeInTheDocument();
+
+    await user.click(within(list()).getByRole("button", { name: v1Name }));
+    dialog = await screen.findByRole("alertdialog");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Descartar edições e ir" }),
+    );
+    expect(await screen.findByText("Voltou para v1")).toBeInTheDocument();
+    expect(screen.getByText("v1 · 20 versões")).toBeInTheDocument();
+    expect(editor()).toHaveValue(V1);
+    expect(manualItems()).toHaveLength(0);
+  }, 30_000);
+
   it("Novo componente with one version and a draft asks first (D-07)", async () => {
     const user = userEvent.setup();
     render(<GeneratorShell />);

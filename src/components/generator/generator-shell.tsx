@@ -22,7 +22,12 @@ import {
   REFINE_ERROR_MESSAGE,
 } from "@/lib/generate-error";
 import { parseCode } from "@/lib/parse-code";
-import { currentNumber, laterRange, versionNumber } from "@/lib/session";
+import {
+  currentNumber,
+  laterRange,
+  MAX_VERSIONS,
+  versionNumber,
+} from "@/lib/session";
 import { cn } from "@/lib/utils";
 
 const SandboxPreview = dynamic(
@@ -228,7 +233,11 @@ export function GeneratorShell() {
 
   function handleRestore(versionId: number) {
     const idx = versions.findIndex((v) => v.id === versionId);
-    if (dirty && idx > cursor) {
+    // WR-01: committing right after a cursor at the cap evicts versions[0],
+    // so restoring the oldest version would silently land on the new manual
+    // version instead. Treat it like a later version: ask, no commit.
+    const evictsTarget = dirty && idx === 0 && cursor + 2 > MAX_VERSIONS;
+    if (dirty && (idx > cursor || evictsTarget)) {
       // D-09: going forward would drop the draft; ask first, no commit.
       restoreFocusRef.current =
         document.activeElement instanceof HTMLElement
