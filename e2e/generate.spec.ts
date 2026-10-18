@@ -108,7 +108,7 @@ test.describe("refine smoke", () => {
     await expect(page.getByText("Pronto — v2")).toBeVisible({ timeout: 15000 });
     await expect(page.locator(IFRAME)).toHaveAttribute("srcdoc", /Refinado/);
     await expect(field).toHaveValue("");
-    await expect(page.getByText("v2 de 2")).toBeVisible();
+    await expect(page.getByText("v2 · 2 versões")).toBeVisible();
 
     await page.getByRole("button", { name: "Desfazer" }).click();
     await expect(page.getByText("Voltou para v1")).toBeVisible();
@@ -129,7 +129,42 @@ test.describe("refine smoke", () => {
     await expect(alert).toBeVisible({ timeout: 15000 });
     await expect(alert).toContainText("Sua versão anterior foi mantida");
     await expect(page.locator(IFRAME)).toHaveAttribute("srcdoc", /FixtureCard/);
-    await expect(page.getByText("v1 de 1")).toBeVisible();
+    await expect(page.getByText("v1 · 1 versão")).toBeVisible();
     await expect(field).toHaveValue("__e2e_error__ refine");
+  });
+
+  test("restore an earlier turn from the list", async ({ page }) => {
+    await generate(page);
+    await expect(page.getByText("Pronto — v1")).toBeVisible({ timeout: 15000 });
+
+    await page.getByRole("textbox", { name: "Descreva a mudança" }).fill("azul");
+    await page.getByRole("button", { name: "Refinar", exact: true }).click();
+    await expect(page.getByText("Pronto — v2")).toBeVisible({ timeout: 15000 });
+
+    const list = page.getByRole("list", { name: "Histórico de versões" });
+    await expect(list).toBeVisible();
+    await expect(list.getByRole("listitem")).toHaveCount(2);
+    await expect(
+      page.getByRole("button", { name: /^v2, versão atual:/ }),
+    ).toHaveAttribute("aria-current", "true");
+
+    await page.getByRole("button", { name: /^Restaurar v1:/ }).click();
+    await expect(page.getByText("Voltou para v1")).toBeVisible();
+    const iframe = page.locator(IFRAME);
+    await expect(iframe).toHaveAttribute("srcdoc", /FixtureCard/);
+    await expect(iframe).not.toHaveAttribute("srcdoc", /Refinado/);
+    await expect(
+      page.getByText("Refinar a partir da v1 — v2 será descartada"),
+    ).toBeVisible();
+    // The accessible name changes after restore, so re-query by the new name.
+    const v1Current = page.getByRole("button", { name: /^v1, versão atual:/ });
+    await expect(v1Current).toBeFocused();
+    await expect(v1Current).toHaveAttribute("aria-current", "true");
+
+    await page
+      .getByRole("button", { name: /^Restaurar v2:.*Será descartada ao refinar\.$/ })
+      .click();
+    await expect(page.getByText("Foi para v2")).toBeVisible();
+    await expect(iframe).toHaveAttribute("srcdoc", /Refinado/);
   });
 });
