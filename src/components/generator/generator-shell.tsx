@@ -7,6 +7,8 @@ import { CodeView } from "@/components/generator/code-view";
 import { NewComponentDialog } from "@/components/generator/new-component-dialog";
 import { PromptForm } from "@/components/generator/prompt-form";
 import { SessionBar } from "@/components/generator/session-bar";
+import { TurnList } from "@/components/generator/turn-list";
+import type { TurnTransient } from "@/components/generator/turn-list";
 import { useGeneratorSession } from "@/components/generator/use-generator-session";
 import { useSuggestions } from "@/components/generator/use-suggestions";
 import { useUndoShortcut } from "@/components/generator/use-undo-shortcut";
@@ -18,6 +20,7 @@ import {
   REFINE_ERROR_MESSAGE,
 } from "@/lib/generate-error";
 import { parseCode } from "@/lib/parse-code";
+import { currentNumber, laterRange } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
 const SandboxPreview = dynamic(
@@ -54,6 +57,9 @@ export function GeneratorShell() {
   const { state, committed, busy, canUndo } = session;
   const { pending, error, notice, versions, cursor } = state;
   const refineMode = versions.length > 0;
+  // Stable display numbers (D-17): survive the MAX_VERSIONS cap.
+  const n = currentNumber(state);
+  const later = laterRange(state);
 
   const [tab, setTab] = useState<Tab>("preview");
   const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({
@@ -62,6 +68,8 @@ export function GeneratorShell() {
   });
   const [prompt, setPrompt] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // D-02: mobile history disclosure; only "Novo componente" collapses it.
+  const [historyOpen, setHistoryOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const newBtnRef = useRef<HTMLButtonElement | null>(null);
 
@@ -86,12 +94,36 @@ export function GeneratorShell() {
     ? parseCode(pending.text)
     : (committed?.code ?? "");
 
-  // Single source of the status text (D-16).
+  // Single source of the status text (D-16, D-20).
   let status = "";
   if (pending) status = committed ? "Refinando…" : "Gerando…";
-  else if (notice === "committed") status = `Pronto — v${cursor + 1}`;
-  else if (notice === "undo") status = `Voltou para v${cursor + 1}`;
+  else if (notice === "committed") status = `Pronto — v${n}`;
+  else if (notice === "undo") status = `Voltou para v${n}`;
+  else if (notice === "forward") status = `Foi para v${n}`;
   else if (notice === "reset") status = "Novo componente iniciado";
+
+  // D-09/D-10/D-11: streaming row while pending (Parar clears it); error row
+  // only for a failed refine (a failed first generation has no list).
+  const transient: TurnTransient = pending
+    ? { kind: "gerando", instruction: pending.instruction }
+    : error && versions.length > 0
+      ? { kind: "erro", instruction: error.instruction }
+      : null;
+
+  // D-15: later versions are discarded only when a refine commits.
+  let baseNotice: string | null = null;
+  if (later) {
+    baseNotice =
+      later.from === later.to
+        ? `Refinar a partir da v${n} — v${later.from} será descartada`
+        : `Refinar a partir da v${n} — v${later.from} a v${later.to} serão descartadas`;
+  }
+
+  // D-12: scroll the code panel to the top after a restore/undo.
+  const scrollResetKey =
+    !pending && (notice === "undo" || notice === "forward")
+      ? (committed?.id ?? null)
+      : null;
 
   let errorMessage: string | null = null;
   if (error) {
@@ -122,6 +154,7 @@ export function GeneratorShell() {
   function doReset() {
     session.reset();
     suggestions.reset();
+    setHistoryOpen(false);
     // D-13: prompt text is intentionally preserved.
   }
 
@@ -168,10 +201,25 @@ export function GeneratorShell() {
           mode={refineMode ? "refine" : "generate"}
           chips={refineMode ? chips : null}
           textareaRef={textareaRef}
+          baseNotice={refineMode ? baseNotice : null}
+          turnList={
+            refineMode ? (
+              <TurnList
+                versions={versions}
+                cursor={cursor}
+                droppedCount={state.droppedCount}
+                busy={busy}
+                transient={transient}
+                open={historyOpen}
+                onOpenChange={setHistoryOpen}
+                onRestore={session.restore}
+              />
+            ) : null
+          }
           sessionBar={
             refineMode ? (
               <SessionBar
-                position={cursor + 1}
+                number={n ?? 1}
                 total={versions.length}
                 canUndo={canUndo}
                 busy={busy}
@@ -288,7 +336,11 @@ export function GeneratorShell() {
           aria-labelledby="tab-code"
           className={cn("min-h-0 min-w-0 flex-1", tab !== "code" && "max-md:hidden")}
         >
-          <CodeView code={codeForPanel} busy={busy} />
+          <CodeView
+            code={codeForPanel}
+            busy={busy}
+            scrollResetKey={scrollResetKey}
+          />
         </div>
       </div>
       <NewComponentDialog

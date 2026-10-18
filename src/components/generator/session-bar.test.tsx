@@ -9,7 +9,7 @@ function setup(props: Partial<React.ComponentProps<typeof SessionBar>> = {}) {
   const onNew = vi.fn()
   render(
     <SessionBar
-      position={3}
+      number={3}
       total={5}
       canUndo
       busy={false}
@@ -24,12 +24,17 @@ function setup(props: Partial<React.ComponentProps<typeof SessionBar>> = {}) {
 describe("SessionBar", () => {
   it("shows position, toolbar and shortcut attribute", () => {
     setup()
-    expect(screen.getByText("v3 de 5")).toBeInTheDocument()
+    expect(screen.getByText("v3 · 5 versões")).toBeInTheDocument()
     expect(screen.getByRole("toolbar", { name: "Sessão" })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: /Desfazer/ })).toHaveAttribute(
       "aria-keyshortcuts",
       "Control+Z Meta+Z"
     )
+  })
+
+  it("uses the singular form for a single version", () => {
+    setup({ number: 1, total: 1 })
+    expect(screen.getByText("v1 · 1 versão")).toBeInTheDocument()
   })
 
   it("calls handlers on click", async () => {

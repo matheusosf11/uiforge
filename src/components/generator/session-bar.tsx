@@ -6,7 +6,7 @@ import { FilePlus2, Undo2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 type SessionBarProps = {
-  position: number
+  number: number
   total: number
   canUndo: boolean
   busy: boolean
@@ -16,7 +16,7 @@ type SessionBarProps = {
 }
 
 export function SessionBar({
-  position,
+  number,
   total,
   canUndo,
   busy,
@@ -32,7 +32,7 @@ export function SessionBar({
       className="mb-2 flex flex-wrap items-center justify-between gap-2"
     >
       <span className="text-xs text-muted-foreground tabular-nums">
-        v{position} de {total}
+        v{number} · {total} {total === 1 ? "versão" : "versões"}
       </span>
       <div className="flex items-center gap-1">
         <Button

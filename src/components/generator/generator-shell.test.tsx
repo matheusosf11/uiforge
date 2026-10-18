@@ -139,7 +139,7 @@ describe("GeneratorShell", () => {
     expect(screen.getByPlaceholderText(/Descreva a mudança/)).toBeInTheDocument();
     expect(screen.queryByRole("group", { name: "Exemplos" })).toBeNull();
     expect(screen.getByRole("textbox")).toHaveValue("");
-    expect(screen.getByText("v1 de 1")).toBeInTheDocument();
+    expect(screen.getByText("v1 · 1 versão")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Desfazer/ })).toBeDisabled();
     expect(screen.getByTestId("preview")).toHaveAttribute(
       "data-code",
@@ -171,7 +171,7 @@ describe("GeneratorShell", () => {
 
     await user.click(screen.getByRole("button", { name: "Refinar" }));
     expect(await screen.findByText("Pronto — v2")).toBeInTheDocument();
-    expect(screen.getByText("v2 de 2")).toBeInTheDocument();
+    expect(screen.getByText("v2 · 2 versões")).toBeInTheDocument();
     expect(screen.queryByText("Atualizando…")).toBeNull();
     expect(screen.getByTestId("preview")).toHaveAttribute(
       "data-code",
@@ -191,7 +191,7 @@ describe("GeneratorShell", () => {
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(REFINE_ERROR_MESSAGE);
     expect(screen.getByRole("textbox")).toHaveValue("azul");
-    expect(screen.getByText("v1 de 1")).toBeInTheDocument();
+    expect(screen.getByText("v1 · 1 versão")).toBeInTheDocument();
     expect(screen.getByTestId("preview")).toHaveAttribute(
       "data-code",
       FIXED_COMPONENT.trim(),
@@ -217,7 +217,7 @@ describe("GeneratorShell", () => {
     );
     await waitFor(() => expect(genBodies).toHaveLength(2));
     expect(genBodies[1]).toEqual({ prompt: "um card" });
-    expect(await screen.findByText("v1 de 1")).toBeInTheDocument();
+    expect(await screen.findByText("v1 · 1 versão")).toBeInTheDocument();
 
     await refine(user, "azul");
     await screen.findByText("Pronto — v2");
@@ -230,7 +230,7 @@ describe("GeneratorShell", () => {
       currentCode: FIXED_COMPONENT.trim(),
     });
     expect(await screen.findByText("Pronto — v2")).toBeInTheDocument();
-    expect(screen.getByText("v2 de 2")).toBeInTheDocument();
+    expect(screen.getByText("v2 · 2 versões")).toBeInTheDocument();
   });
 
   it("Parar during refine keeps v1 and the typed text", async () => {
@@ -245,7 +245,7 @@ describe("GeneratorShell", () => {
     await user.click(screen.getByRole("button", { name: "Parar" }));
 
     await waitFor(() => expect(screen.queryByText("Refinando…")).toBeNull());
-    expect(screen.getByText("v1 de 1")).toBeInTheDocument();
+    expect(screen.getByText("v1 · 1 versão")).toBeInTheDocument();
     expect(screen.getByRole("textbox")).toHaveValue("azul");
     expect(screen.getByTestId("preview")).toHaveAttribute(
       "data-code",
@@ -260,7 +260,7 @@ describe("GeneratorShell", () => {
 
     await user.click(screen.getByRole("button", { name: /Desfazer/ }));
     expect(await screen.findByText("Voltou para v1")).toBeInTheDocument();
-    expect(screen.getByText("v1 de 2")).toBeInTheDocument();
+    expect(screen.getByText("v1 · 2 versões")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Desfazer/ })).toBeDisabled();
 
     // Refine again: truncates at commit, creating v2 again.
@@ -271,7 +271,7 @@ describe("GeneratorShell", () => {
     const box = screen.getByRole("textbox");
     await user.click(box);
     await user.keyboard("{Control>}z{/Control}");
-    expect(screen.getByText("v2 de 2")).toBeInTheDocument();
+    expect(screen.getByText("v2 · 2 versões")).toBeInTheDocument();
 
     // Ctrl+Z on body undoes.
     box.blur();
@@ -289,7 +289,7 @@ describe("GeneratorShell", () => {
     await screen.findByText("Refinando…");
     expect(screen.getByRole("button", { name: /Desfazer/ })).toBeDisabled();
     await user.keyboard("{Control>}z{/Control}");
-    expect(screen.getByText("v2 de 2")).toBeInTheDocument();
+    expect(screen.getByText("v2 · 2 versões")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Parar" }));
   });
 
@@ -307,7 +307,7 @@ describe("GeneratorShell", () => {
 
     await user.keyboard("{Escape}");
     await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
-    expect(screen.getByText("v2 de 2")).toBeInTheDocument();
+    expect(screen.getByText("v2 · 2 versões")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Novo componente/ }));
     await user.click(
@@ -320,7 +320,10 @@ describe("GeneratorShell", () => {
     expect(screen.getByRole("textbox", { name: "Prompt" })).toHaveValue(
       "rascunho",
     );
-    expect(screen.queryByText(/ de \d+$/)).toBeNull();
+    expect(screen.queryByText(/ · \d+ versões?$/)).toBeNull();
+    expect(
+      screen.queryByRole("list", { name: "Histórico de versões" }),
+    ).toBeNull();
     // UI-SPEC section 3: on confirm, focus moves to the textarea.
     await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
     await waitFor(() =>
