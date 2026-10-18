@@ -28,7 +28,7 @@ Out of scope: new product features, deploy and push. The user will push/deploy; 
 - The mock model is env-gated (`UIFORGE_E2E_MOCK=1`). It returns FixtureCard, a "Refinado" variant for refine, and a `__e2e_error__` prompt for failures.
 
 ### E2E journey (QUAL-07)
-- **D-01:** Add a new spec, `e2e/journey.spec.ts`, with ONE serial test that runs: generate → refine (v2) → undo (back to v1) → manual edit (draft) → refine after the edit (the request's `currentCode` contains the edit; "Edição manual" v3 then v4) → a failed refine via `__e2e_error__` keeps the previous version (code and preview unchanged, alert shown).
+- **D-01:** Add a new spec, `e2e/journey.spec.ts`, with ONE serial test that runs: generate → refine (v2) → undo (back to v1) → manual edit (draft) → refine after the edit (the request's `currentCode` contains the edit; committing the edit made from v1 discards the later v2, so "Edição manual" is recorded as v2 and the refined result as v3, matching the session reducer; updated after review IN-07) → a failed refine via `__e2e_error__` keeps the previous version (code and preview unchanged, alert shown).
 - **D-02:** Keep the existing smoke specs as they are. The journey reuses the same selector conventions:
   - the IFRAME constant for the preview;
   - exact role names;
