@@ -178,6 +178,12 @@ test.describe("edit smoke", () => {
   }) => {
     await generate(page);
     await expect(page.getByText("Pronto — v1")).toBeVisible({ timeout: 15000 });
+    // The preview is a dynamic chunk; under parallel workers it can still be
+    // on its loading fallback right after "Pronto", so wait for it to mount.
+    const iframe = page.locator(IFRAME);
+    await expect(iframe).toHaveAttribute("srcdoc", /FixtureCard/, {
+      timeout: 15000,
+    });
 
     const editor = page.getByRole("textbox", { name: "Editor de código" });
     const original = await editor.inputValue();
@@ -185,8 +191,10 @@ test.describe("edit smoke", () => {
     await editor.fill(`${original}\n// marca-e2e`);
     const codeSection = page.getByRole("region", { name: "Código" });
     await expect(codeSection.getByText("Editado", { exact: true })).toBeVisible();
-    // Debounced draft reaches the preview document.
-    await expect(page.locator(IFRAME)).toHaveAttribute("srcdoc", /marca-e2e/);
+    // Debounced draft (500 ms) reaches the preview document.
+    await expect(iframe).toHaveAttribute("srcdoc", /marca-e2e/, {
+      timeout: 15000,
+    });
 
     await page.getByRole("textbox", { name: "Descreva a mudança" }).fill("azul");
     const req = page.waitForRequest(isGenerate);
