@@ -25,7 +25,13 @@ export type Pending = {
   text: string;
 };
 
-export type SessionNotice = "committed" | "undo" | "forward" | "reset" | null;
+export type SessionNotice =
+  | "committed"
+  | "manual"
+  | "undo"
+  | "forward"
+  | "reset"
+  | null;
 
 export type SessionState = {
   versions: Version[];
@@ -37,6 +43,9 @@ export type SessionState = {
   // Versions evicted by the MAX_VERSIONS cap; offsets display numbers so they
   // stay stable (ids are internal and never shown).
   droppedCount: number;
+  // Id of the manual version committed by the last COMMIT_MANUAL, kept for one
+  // follow-up action so the status can say "Edição salva como vM".
+  savedManualId: number | null;
 };
 
 export type SessionAction =
@@ -50,6 +59,8 @@ export type SessionAction =
   | { type: "REJECT"; kind: "too_large"; instruction: string }
   | { type: "UNDO" }
   | { type: "RESTORE"; versionId: number }
+  // Save the user's edited code as a "manual" version (saved as-is).
+  | { type: "COMMIT_MANUAL"; code: string }
   | { type: "RESET" };
 
 export const initialSessionState: SessionState = {
@@ -60,6 +71,7 @@ export const initialSessionState: SessionState = {
   nextVersionId: 1,
   notice: null,
   droppedCount: 0,
+  savedManualId: null,
 };
 
 export function committedVersion(state: SessionState): Version | null {
@@ -108,12 +120,46 @@ export function laterRange(
  * so it is only safe when the current version is the last kept one (no later
  * versions to silently discard) and its real base still exists: a parent
  * (cursor > 0) or, at cursor 0, a true first generation (nothing evicted).
+ * D-12: a manual version has no instruction to replay, so it never regenerates.
  */
 export function canRegenerate(state: SessionState): boolean {
   if (state.cursor < 0 || state.cursor !== state.versions.length - 1) {
     return false;
   }
+  if (committedVersion(state)?.source !== "ai") return false;
   return state.cursor > 0 || state.droppedCount === 0;
+}
+
+// Appends `version` after `kept`, applies the MAX_VERSIONS cap and moves the
+// cursor to it. Shared by COMMIT (ai) and COMMIT_MANUAL.
+function appendVersion(
+  state: SessionState,
+  kept: Version[],
+  version: Version,
+  notice: "committed" | "manual",
+): SessionState {
+  const versions = [...kept, version];
+  let dropped = 0;
+  while (versions.length > MAX_VERSIONS) {
+    versions.shift();
+    dropped++;
+  }
+  return {
+    versions,
+    cursor: versions.length - 1,
+    pending: null,
+    error: null,
+    nextVersionId: state.nextVersionId + 1,
+    notice,
+    droppedCount: state.droppedCount + dropped,
+    savedManualId: notice === "manual" ? version.id : null,
+  };
+}
+
+// START, UNDO, RESTORE and REJECT carry the saved-manual status through
+// exactly one follow-up action.
+function carriedManualId(state: SessionState): number | null {
+  return state.notice === "manual" ? state.savedManualId : null;
 }
 
 export function sessionReducer(
@@ -136,6 +182,7 @@ export function sessionReducer(
         },
         error: null,
         notice: null,
+        savedManualId: carriedManualId(state),
       };
     }
     case "CHUNK": {
@@ -156,6 +203,7 @@ export function sessionReducer(
             baseId: pending.baseId,
           },
           notice: null,
+          savedManualId: null,
         };
       }
       const baseIndex =
@@ -174,32 +222,39 @@ export function sessionReducer(
             baseId: pending.baseId,
           },
           notice: null,
+          savedManualId: null,
         };
       }
-      const kept = state.versions.slice(0, baseIndex + 1);
-      const versions = [
-        ...kept,
+      return appendVersion(
+        state,
+        state.versions.slice(0, baseIndex + 1),
         {
           id: state.nextVersionId,
           code,
           instruction: pending.instruction,
-          source: "ai" as const,
+          source: "ai",
         },
-      ];
-      let dropped = 0;
-      while (versions.length > MAX_VERSIONS) {
-        versions.shift();
-        dropped++;
-      }
-      return {
-        versions,
-        cursor: versions.length - 1,
-        pending: null,
-        error: null,
-        nextVersionId: state.nextVersionId + 1,
-        notice: "committed",
-        droppedCount: state.droppedCount + dropped,
-      };
+        "committed",
+      );
+    }
+    case "COMMIT_MANUAL": {
+      // D-05: never while streaming. D-06: an equal draft is no draft.
+      // D-10: saved as-is (no export default check); size is checked by the
+      // hook before any request.
+      if (state.pending !== null) return state;
+      const base = committedVersion(state);
+      if (!base || action.code === base.code) return state;
+      return appendVersion(
+        state,
+        state.versions.slice(0, state.cursor + 1),
+        {
+          id: state.nextVersionId,
+          code: action.code,
+          instruction: "",
+          source: "manual",
+        },
+        "manual",
+      );
     }
     case "FAIL": {
       const pending = state.pending;
@@ -213,11 +268,18 @@ export function sessionReducer(
           baseId: pending.baseId,
         },
         notice: null,
+        savedManualId: null,
       };
     }
     case "ABORT": {
       if (!state.pending || state.pending.id !== action.id) return state;
-      return { ...state, pending: null, error: null, notice: null };
+      return {
+        ...state,
+        pending: null,
+        error: null,
+        notice: null,
+        savedManualId: null,
+      };
     }
     case "REJECT": {
       if (state.pending !== null) return state;
@@ -228,12 +290,19 @@ export function sessionReducer(
           instruction: action.instruction,
           baseId: committedVersion(state)?.id ?? null,
         },
-        notice: null,
+        notice: state.notice === "manual" ? "manual" : null,
+        savedManualId: carriedManualId(state),
       };
     }
     case "UNDO": {
       if (!canUndo(state)) return state;
-      return { ...state, cursor: state.cursor - 1, error: null, notice: "undo" };
+      return {
+        ...state,
+        cursor: state.cursor - 1,
+        error: null,
+        notice: "undo",
+        savedManualId: carriedManualId(state),
+      };
     }
     case "RESTORE": {
       // Later versions survive (implicit redo); truncation happens at COMMIT.
@@ -245,6 +314,7 @@ export function sessionReducer(
         cursor: index,
         error: null,
         notice: index < state.cursor ? "undo" : "forward",
+        savedManualId: carriedManualId(state),
       };
     }
     case "RESET": {
@@ -256,6 +326,7 @@ export function sessionReducer(
         nextVersionId: state.nextVersionId,
         notice: "reset",
         droppedCount: 0,
+        savedManualId: null,
       };
     }
     default:
