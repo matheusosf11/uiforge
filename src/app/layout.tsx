@@ -55,6 +55,9 @@ export default function RootLayout({
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"
+          // Dark only: overrides any "light" left in localStorage from the
+          // old theme toggle.
+          forcedTheme="dark"
           enableSystem={false}
           disableTransitionOnChange
         >

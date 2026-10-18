@@ -46,13 +46,14 @@ export const TOPOLOGY_FIELD_DEFAULTS = {
 // Trimmed from the 21st.dev original: the focus script hides everything except
 // #animationCanvas, so the demo copy, floating cards, Tailwind/Iconify CDNs,
 // font and avatar image were dropped (same visual, far fewer requests).
+// three.js is pinned with Subresource Integrity (hash from cdnjs).
 const topologySource = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Topology</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" integrity="sha512-dLxUelApnYxpLt6K2iomGngnHO83iUvZytA3YjDUCjT0HDOHKXnVYdf3hU4JjM8uEhxf9nD1/ey98U3t2vZ0qQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
 <body style="background: radial-gradient(circle at bottom right, #18181b 0%, #000000 50%, #000000 100%); overflow: hidden; margin: 0; padding: 0; height: 100vh; width: 100vw;">
     <canvas id="animationCanvas" style="position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none;"></canvas>
