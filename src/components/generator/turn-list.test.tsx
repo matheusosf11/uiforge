@@ -1,10 +1,15 @@
 /// <reference types="vitest/globals" />
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   TransientTurnItem,
   TurnItem,
 } from "@/components/generator/turn-item";
+import {
+  TurnList,
+  scrollIntoContainer,
+} from "@/components/generator/turn-list";
+import type { Version } from "@/lib/session";
 
 describe("TurnItem", () => {
   it("renders a 'before' version as a restorable button", async () => {
@@ -119,5 +124,188 @@ describe("TransientTurnItem", () => {
     expect(screen.queryByRole("button")).toBeNull();
     expect(container).toHaveTextContent("Erro: mais");
     expect(screen.getByText("erro")).toHaveAttribute("aria-hidden", "true");
+  });
+});
+
+function makeVersions(instructions: string[], firstId = 1): Version[] {
+  return instructions.map((instruction, i) => ({
+    id: firstId + i,
+    code: `export default function C${i}() {\n  return <div>${i}</div>;\n}`,
+    instruction,
+    source: "ai",
+  }));
+}
+
+type ListProps = Parameters<typeof TurnList>[0];
+
+function renderList(overrides: Partial<ListProps> = {}) {
+  const props: ListProps = {
+    versions: makeVersions(["um card", "azul", "verde"]),
+    cursor: 2,
+    droppedCount: 0,
+    busy: false,
+    transient: null,
+    open: false,
+    onOpenChange: vi.fn(),
+    onRestore: vi.fn(),
+    ...overrides,
+  };
+  const utils = render(<TurnList {...props} />);
+  return { ...utils, props };
+}
+
+function list() {
+  return screen.getByRole("list", { name: "Histórico de versões" });
+}
+
+function rect(top: number, bottom: number): DOMRect {
+  return {
+    top,
+    bottom,
+    left: 0,
+    right: 0,
+    width: 0,
+    height: bottom - top,
+    x: 0,
+    y: top,
+    toJSON: () => ({}),
+  };
+}
+
+describe("TurnList", () => {
+  it("renders one item per version, oldest first, with the current marked", () => {
+    renderList();
+    const items = within(list()).getAllByRole("listitem");
+    expect(items).toHaveLength(3);
+    const buttons = within(list()).getAllByRole("button");
+    expect(buttons.map((b) => b.textContent?.slice(0, 2))).toEqual([
+      "v1",
+      "v2",
+      "v3",
+    ]);
+    expect(buttons[2]).toHaveAttribute("aria-current", "true");
+    expect(buttons[0]).not.toHaveAttribute("aria-current");
+  });
+
+  it("marks versions after the cursor as later and restores by id", async () => {
+    const { props } = renderList({ cursor: 0 });
+    const v2 = screen.getByRole("button", {
+      name: "Restaurar v2: azul. Concluída. Será descartada ao refinar.",
+    });
+    expect(
+      screen.getByRole("button", {
+        name: "Restaurar v3: verde. Concluída. Será descartada ao refinar.",
+      }),
+    ).toBeInTheDocument();
+    await userEvent.click(v2);
+    expect(props.onRestore).toHaveBeenCalledWith(props.versions[1].id);
+  });
+
+  it("shows 'Edição manual' for manual versions", () => {
+    const versions = makeVersions(["um card", "ignored"]);
+    versions[1] = { ...versions[1], source: "manual" };
+    renderList({ versions, cursor: 1 });
+    expect(
+      screen.getByRole("button", {
+        name: "v2, versão atual: Edição manual. Concluída.",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("offsets numbers by droppedCount and shows the cap line", () => {
+    renderList({
+      versions: makeVersions(["a", "b"], 10),
+      cursor: 1,
+      droppedCount: 4,
+    });
+    const buttons = within(list()).getAllByRole("button");
+    expect(buttons[0]).toHaveTextContent("v5");
+    expect(buttons[1]).toHaveTextContent("v6");
+    const cap = screen.getByText(
+      "Versões mais antigas descartadas (limite de 20)",
+    );
+    expect(document.getElementById("turn-list-region")).toContainElement(cap);
+    expect(cap.closest("li")).toBeNull();
+  });
+
+  it("hides the cap line when nothing was dropped", () => {
+    renderList();
+    expect(
+      screen.queryByText("Versões mais antigas descartadas (limite de 20)"),
+    ).toBeNull();
+  });
+
+  it("renders a transient row as the last, non-interactive item", () => {
+    renderList({ transient: { kind: "gerando", instruction: "mais" } });
+    const items = within(list()).getAllByRole("listitem");
+    expect(items).toHaveLength(4);
+    expect(within(items[3]).queryByRole("button")).toBeNull();
+    expect(items[3]).toHaveTextContent("Gerando: mais");
+  });
+
+  it("renders no extra item without a transient", () => {
+    renderList();
+    expect(within(list()).getAllByRole("listitem")).toHaveLength(3);
+  });
+
+  it("disables every version button while busy", () => {
+    renderList({ busy: true });
+    for (const b of within(list()).getAllByRole("button")) {
+      expect(b).toBeDisabled();
+    }
+  });
+
+  it("exposes a mobile disclosure controlling the region", async () => {
+    const { props, rerender } = renderList({
+      transient: { kind: "gerando", instruction: "mais" },
+    });
+    const toggle = screen.getByRole("button", { name: "Histórico (3)" });
+    expect(toggle).toHaveAttribute("aria-controls", "turn-list-region");
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(document.getElementById("turn-list-region")).not.toBeNull();
+    await userEvent.click(toggle);
+    expect(props.onOpenChange).toHaveBeenCalledWith(true);
+    rerender(<TurnList {...props} open />);
+    expect(
+      screen.getByRole("button", { name: "Histórico (3)" }),
+    ).toHaveAttribute("aria-expanded", "true");
+    expect(document.getElementById("turn-list-region")).not.toBeNull();
+  });
+
+  it("keeps the same DOM nodes when the cursor changes", () => {
+    const { props, rerender } = renderList();
+    const before = within(list()).getAllByRole("button")[0];
+    rerender(<TurnList {...props} cursor={0} />);
+    const after = within(list()).getAllByRole("button")[0];
+    expect(after).toBe(before);
+  });
+});
+
+describe("scrollIntoContainer", () => {
+  function setup(c: DOMRect, e: DOMRect, scrollTop: number) {
+    const container = document.createElement("div");
+    const el = document.createElement("div");
+    container.getBoundingClientRect = () => c;
+    el.getBoundingClientRect = () => e;
+    container.scrollTop = scrollTop;
+    return { container, el };
+  }
+
+  it("scrolls down when the element is below the container", () => {
+    const { container, el } = setup(rect(0, 100), rect(120, 152), 0);
+    scrollIntoContainer(container, el);
+    expect(container.scrollTop).toBe(52);
+  });
+
+  it("scrolls up when the element is above the container", () => {
+    const { container, el } = setup(rect(100, 200), rect(60, 92), 80);
+    scrollIntoContainer(container, el);
+    expect(container.scrollTop).toBe(40);
+  });
+
+  it("leaves the scroll unchanged when the element is visible", () => {
+    const { container, el } = setup(rect(0, 100), rect(20, 52), 30);
+    scrollIntoContainer(container, el);
+    expect(container.scrollTop).toBe(30);
   });
 });
