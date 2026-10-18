@@ -13,9 +13,12 @@ type CopyState = "idle" | "copied" | "failed";
 export function CodeView({
   code,
   busy = false,
+  scrollResetKey = null,
 }: {
   code: string;
   busy?: boolean;
+  /** Changing a non-null value scrolls the code back to the top (restore, D-12). */
+  scrollResetKey?: number | null;
 }) {
   const preRef = useRef<HTMLPreElement>(null);
   const timeoutRef = useRef<number | null>(null);
@@ -35,6 +38,11 @@ export function CodeView({
       if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (scrollResetKey === null) return;
+    if (preRef.current) preRef.current.scrollTop = 0;
+  }, [scrollResetKey]);
 
   const disabled = busy || !code.trim();
 
