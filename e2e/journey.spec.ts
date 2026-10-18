@@ -2,6 +2,9 @@ import { test, expect, type Page } from "@playwright/test";
 
 // Same conventions as generate.spec.ts (D-02), redefined locally on purpose.
 const IFRAME = 'iframe[title="Live preview"]';
+// The status line (generator-shell). Scoped so a status substring cannot also
+// match the robot speech bubble ("Voltou para v1.") on viewports >= 1536px.
+const STATUS = '[aria-live="polite"][aria-atomic="true"]';
 
 const isGenerate = (r: import("@playwright/test").Request) =>
   r.method() === "POST" && r.url().includes("/api/generate");
@@ -23,10 +26,11 @@ test("journey: generate, refine, undo, edit, refine after edit, failed refine ke
   const field = page.getByRole("textbox", { name: "Descreva a mudança" });
   const refineButton = page.getByRole("button", { name: "Refinar", exact: true });
   const editor = page.getByRole("textbox", { name: "Editor de código" });
+  const status = page.locator(STATUS);
 
   // (1) Generate v1.
   await generate(page);
-  await expect(page.getByText("Pronto — v1")).toBeVisible({ timeout: 15000 });
+  await expect(status).toContainText("Pronto — v1", { timeout: 15000 });
   // The preview is a dynamic chunk, so give it time to mount.
   await expect(iframe).toHaveAttribute("srcdoc", /FixtureCard/, {
     timeout: 15000,
@@ -39,13 +43,13 @@ test("journey: generate, refine, undo, edit, refine after edit, failed refine ke
   await refineButton.click();
   expect((await refineReq).postDataJSON().currentCode).toContain("FixtureCard");
   expect((await refineRes).ok()).toBe(true);
-  await expect(page.getByText("Pronto — v2")).toBeVisible({ timeout: 15000 });
+  await expect(status).toContainText("Pronto — v2", { timeout: 15000 });
   await expect(iframe).toHaveAttribute("srcdoc", /Refinado/, { timeout: 15000 });
   await expect(page.getByText("v2 · 2 versões")).toBeVisible();
 
   // (3) Undo back to v1; v2 survives as a later version.
   await page.getByRole("button", { name: "Desfazer" }).click();
-  await expect(page.getByText("Voltou para v1")).toBeVisible();
+  await expect(status).toContainText("Voltou para v1");
   await expect(iframe).toHaveAttribute("srcdoc", /FixtureCard/);
   await expect(iframe).not.toHaveAttribute("srcdoc", /Refinado/);
   await expect(
@@ -70,7 +74,7 @@ test("journey: generate, refine, undo, edit, refine after edit, failed refine ke
   const editBody = (await editReq).postDataJSON();
   expect(editBody.currentCode).toContain("__edited__");
   expect(editBody.currentCode).toContain("marca-journey");
-  await expect(page.getByText("Pronto — v3")).toBeVisible({ timeout: 15000 });
+  await expect(status).toContainText("Pronto — v3", { timeout: 15000 });
   await expect(iframe).toHaveAttribute("srcdoc", /Refinado/, { timeout: 15000 });
   await expect(iframe).toHaveAttribute("srcdoc", /EditedSeen/);
   await expect(

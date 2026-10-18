@@ -10,7 +10,12 @@ test.describe("readme screenshots", () => {
     await page.goto("/");
     await page.getByRole("textbox", { name: "Prompt" }).fill("A pricing card");
     await page.getByRole("button", { name: "Gerar" }).click();
-    await expect(page.getByText("Pronto")).toBeVisible({ timeout: 15000 });
+    // Scoped to the status line so it cannot also match the robot bubble
+    // ("Pronto! Esta é a v1.") if the viewport ever shows the mascot.
+    await expect(page.locator('[aria-live="polite"][aria-atomic="true"]')).toContainText(
+      "Pronto",
+      { timeout: 15000 },
+    );
     await expect(
       page
         .frameLocator('iframe[title="Live preview"]')
