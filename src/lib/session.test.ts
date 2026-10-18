@@ -6,7 +6,6 @@ import {
   committedVersion,
   currentNumber,
   displayNumber,
-  hasDroppedVersions,
   initialSessionState,
   isBusy,
   laterRange,
@@ -218,7 +217,6 @@ describe("sessionReducer", () => {
     expect(s.droppedCount).toBe(1);
     expect(versionNumber(s, 0)).toBe(2);
     expect(currentNumber(s)).toBe(MAX_VERSIONS + 1);
-    expect(hasDroppedVersions(s)).toBe(true);
     s = commit(s, MAX_VERSIONS + 2, code(MAX_VERSIONS + 2));
     expect(s.droppedCount).toBe(2);
     expect(currentNumber(s)).toBe(MAX_VERSIONS + 2);
@@ -245,7 +243,6 @@ describe("sessionReducer", () => {
     for (let i = 1; i <= MAX_VERSIONS + 1; i++) s = commit(s, i, code(i));
     s = sessionReducer(s, { type: "RESET" });
     expect(s.droppedCount).toBe(0);
-    expect(hasDroppedVersions(s)).toBe(false);
     s = commit(s, 99, code(99));
     expect(currentNumber(s)).toBe(1);
   });

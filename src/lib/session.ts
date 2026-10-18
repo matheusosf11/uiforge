@@ -116,11 +116,6 @@ export function canRegenerate(state: SessionState): boolean {
   return state.cursor > 0 || state.droppedCount === 0;
 }
 
-/** True once the cap has evicted at least one version. */
-export function hasDroppedVersions(state: SessionState): boolean {
-  return state.droppedCount > 0;
-}
-
 export function sessionReducer(
   state: SessionState,
   action: SessionAction,
