@@ -2,6 +2,9 @@ import { test, expect, type Page } from "@playwright/test";
 
 const IFRAME = 'iframe[title="Live preview"]';
 
+const isGenerate = (r: import("@playwright/test").Request) =>
+  r.method() === "POST" && r.url().includes("/api/generate");
+
 async function generate(page: Page, prompt = "a simple card") {
   await page.goto("/");
   await page.getByRole("textbox", { name: "Prompt" }).fill(prompt);
@@ -27,8 +30,6 @@ test("mid-stream error shows alert and retry resends the same prompt", async ({
   page,
 }) => {
   const prompt = "__e2e_error__ test";
-  const isGenerate = (r: import("@playwright/test").Request) =>
-    r.method() === "POST" && r.url().includes("/api/generate");
   const firstReq = page.waitForRequest(isGenerate);
   await generate(page, prompt);
   const first = await firstReq;
@@ -85,9 +86,6 @@ test.describe("mobile", () => {
 });
 
 test.describe("refine smoke", () => {
-  const isGenerate = (r: import("@playwright/test").Request) =>
-    r.method() === "POST" && r.url().includes("/api/generate");
-
   test("refine, then undo back to v1", async ({ page }) => {
     await generate(page);
     await expect(page.getByText("Pronto — v1")).toBeVisible({ timeout: 15000 });
@@ -103,8 +101,11 @@ test.describe("refine smoke", () => {
     await expect(field).toHaveValue(/cor de destaque mais forte/);
     expect(generateCalls).toBe(0);
 
+    // The mock streams fast, so the transient "Atualizando…" badge can vanish
+    // before an assertion sees it. Wait for the refine response instead.
+    const refineRes = page.waitForResponse((res) => isGenerate(res.request()));
     await page.getByRole("button", { name: "Refinar", exact: true }).click();
-    await expect(page.getByText("Atualizando…")).toBeVisible({ timeout: 10000 });
+    expect((await refineRes).ok()).toBe(true);
     await expect(page.getByText("Pronto — v2")).toBeVisible({ timeout: 15000 });
     await expect(page.locator(IFRAME)).toHaveAttribute("srcdoc", /Refinado/);
     await expect(field).toHaveValue("");
@@ -166,5 +167,65 @@ test.describe("refine smoke", () => {
       .click();
     await expect(page.getByText("Foi para v2")).toBeVisible();
     await expect(iframe).toHaveAttribute("srcdoc", /Refinado/);
+  });
+});
+
+test.describe("edit smoke", () => {
+  test.use({ permissions: ["clipboard-read", "clipboard-write"] });
+
+  test("edit updates the preview, refine uses the edit, undo returns to it", async ({
+    page,
+  }) => {
+    await generate(page);
+    await expect(page.getByText("Pronto — v1")).toBeVisible({ timeout: 15000 });
+
+    const editor = page.getByRole("textbox", { name: "Editor de código" });
+    const original = await editor.inputValue();
+    // Marker deliberately avoids "editado" so it cannot collide with the badge.
+    await editor.fill(`${original}\n// marca-e2e`);
+    const codeSection = page.getByRole("region", { name: "Código" });
+    await expect(codeSection.getByText("Editado", { exact: true })).toBeVisible();
+    // Debounced draft reaches the preview document.
+    await expect(page.locator(IFRAME)).toHaveAttribute("srcdoc", /marca-e2e/);
+
+    await page.getByRole("textbox", { name: "Descreva a mudança" }).fill("azul");
+    const req = page.waitForRequest(isGenerate);
+    await page.getByRole("button", { name: "Refinar", exact: true }).click();
+    expect((await req).postDataJSON().currentCode).toContain("marca-e2e");
+    await expect(page.getByText("Pronto — v3")).toBeVisible({ timeout: 15000 });
+    await expect(
+      page.getByRole("list", { name: "Histórico de versões" }),
+    ).toContainText("Edição manual");
+
+    await page.getByRole("button", { name: "Desfazer" }).click();
+    await expect(page.getByText("Voltou para v2")).toBeVisible();
+    await expect(editor).toHaveValue(/marca-e2e/);
+  });
+
+  test("Copiar exports the edited code", async ({ page }) => {
+    await generate(page);
+    await expect(page.getByText("Pronto — v1")).toBeVisible({ timeout: 15000 });
+
+    const editor = page.getByRole("textbox", { name: "Editor de código" });
+    const original = await editor.inputValue();
+    await editor.fill(`${original}\n// copiado-e2e`);
+    await page.getByRole("button", { name: "Copiar" }).click();
+    const text = await page.evaluate(() => navigator.clipboard.readText());
+    expect(text).toContain("copiado-e2e");
+  });
+
+  test("Escape then Tab leaves the editor", async ({ page }) => {
+    await generate(page);
+    await expect(page.getByText("Pronto — v1")).toBeVisible({ timeout: 15000 });
+
+    const editor = page.getByRole("textbox", { name: "Editor de código" });
+    await expect(editor).toHaveAccessibleDescription("Esc e depois Tab para sair");
+    await editor.focus();
+    await page.keyboard.press("Tab");
+    // Tab indents inside the editor instead of moving focus.
+    await expect(editor).toBeFocused();
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Tab");
+    await expect(editor).not.toBeFocused();
   });
 });
