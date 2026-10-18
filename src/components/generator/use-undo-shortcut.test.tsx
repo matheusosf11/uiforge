@@ -43,6 +43,37 @@ describe("useUndoShortcut", () => {
     expect(onUndo).toHaveBeenCalledTimes(1)
   })
 
+  it("ignores Ctrl+Y / Ctrl+W on the physical KeyZ (QWERTZ / AZERTY)", () => {
+    const onUndo = vi.fn()
+    render(<Harness onUndo={onUndo} />)
+    const y = fireEvent.keyDown(document.body, {
+      key: "y",
+      code: "KeyZ",
+      ctrlKey: true,
+    })
+    const w = fireEvent.keyDown(document.body, {
+      key: "w",
+      code: "KeyZ",
+      ctrlKey: true,
+    })
+    expect(onUndo).not.toHaveBeenCalled()
+    expect(y).toBe(true)
+    expect(w).toBe(true)
+  })
+
+  it("undoes on logical z from another physical key, and on KeyZ with a non-printable key", () => {
+    const onUndo = vi.fn()
+    render(<Harness onUndo={onUndo} />)
+    fireEvent.keyDown(document.body, { key: "z", code: "KeyY", ctrlKey: true })
+    fireEvent.keyDown(document.body, { key: "Z", code: "KeyY", ctrlKey: true })
+    fireEvent.keyDown(document.body, {
+      key: "Process",
+      code: "KeyZ",
+      ctrlKey: true,
+    })
+    expect(onUndo).toHaveBeenCalledTimes(3)
+  })
+
   it("ignores Ctrl+Z inside a textarea", async () => {
     const user = userEvent.setup()
     const onUndo = vi.fn()

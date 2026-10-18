@@ -18,7 +18,11 @@ export function useUndoShortcut({ enabled, dialogOpen, onUndo }: Options) {
       if (e.defaultPrevented || e.repeat) return
       if (e.shiftKey || e.altKey) return
       if (!(e.ctrlKey || e.metaKey)) return
-      if (e.key.toLowerCase() !== "z" && e.code !== "KeyZ") return
+      // Match the logical key so Ctrl+Y (QWERTZ) / Ctrl+W (AZERTY) on the
+      // physical KeyZ never undo. `code` is only a fallback when `key` is not
+      // a single printable character (IME / dead keys).
+      const key = e.key.length === 1 ? e.key.toLowerCase() : null
+      if (key !== null ? key !== "z" : e.code !== "KeyZ") return
       const target = e.target
       if (target instanceof Element && target.closest(TEXT_FIELD_SELECTOR)) {
         return
