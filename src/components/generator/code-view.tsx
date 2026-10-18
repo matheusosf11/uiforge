@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Highlight, themes } from "prism-react-renderer";
 import { Check, Copy, Download } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -39,7 +39,9 @@ export function CodeView({
     };
   }, []);
 
-  useEffect(() => {
+  // Layout effect so the reset lands before paint (no one-frame flash at the
+  // previous version's offset, D-12).
+  useLayoutEffect(() => {
     if (scrollResetKey === null) return;
     if (preRef.current) preRef.current.scrollTop = 0;
   }, [scrollResetKey]);
