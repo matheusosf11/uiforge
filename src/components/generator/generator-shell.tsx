@@ -120,10 +120,9 @@ export function GeneratorShell() {
   // retry, REJECT, plain restore/undo). Flows that return to the draft's own
   // base id (commit-then-undo/restore) clear it explicitly in their handlers.
   const committedId = committed?.id ?? null;
-  const hasPending = !!pending;
   useEffect(() => {
     if (draft && draft.baseId !== committedId) setDraft(null);
-  }, [draft, committedId, hasPending]);
+  }, [draft, committedId]);
 
   // D-14/D-05: stream the new code live; pending clears on failure/stop, which
   // reverts the panel to the last committed version (or its draft). WR-03:
