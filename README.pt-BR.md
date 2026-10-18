@@ -23,12 +23,18 @@ O site é apenas escuro. Os dois arquivos são capturados com o modelo mock, ent
 
 ## Funcionalidades
 
-- Prompt (até 2.000 caracteres) com chips de exemplo; o código chega token a token do Gemini.
-- Preview ao vivo do componente gerado dentro de um iframe isolado (sandbox).
+- Prompt (até 2.000 caracteres) com uma galeria de exemplos: 24 prompts completos, prontos para gerar, em seis categorias (Cards, Formulários, Dashboards, Tabelas, Menus, Básicos); o código chega token a token do Gemini.
+- Até 4 imagens de referência (escolhidas, coladas ou arrastadas) enviadas junto com o prompt.
+- Um guia de design no prompt do sistema (uma cor de destaque, escala de espaçamento, cantos, estados de foco, conteúdo realista em pt-BR, layout responsivo, variantes `dark:`, acessibilidade) para resultados mais caprichados e consistentes.
+- Preview ao vivo do componente gerado dentro de um iframe isolado (sandbox), na largura Desktop, Tablet (768px) ou Celular (375px) e em página clara ou escura (as classes `dark:` acompanham).
 - Refinamento iterativo: depois da v1 o campo passa para "Refinar" e envia o código atual junto com a sua instrução; o modelo devolve o componente inteiro atualizado, que vira a próxima versão. "Novo componente" recomeça do zero e pede confirmação quando há várias versões ou edições manuais.
 - Chips de sugestão por IA: depois de cada versão, `/api/suggest` propõe até 4 mudanças curtas; clicar em um chip preenche a instrução (uma lista fixa é usada quando o modelo não está disponível).
 - Histórico de versões: uma lista com todas as versões (prompt, instrução de refino ou "Edição manual"). Dá para restaurar qualquer versão; as versões posteriores aparecem esmaecidas, e refinar a partir de uma anterior avisa isso ("Refinar a partir da vN") antes de descartá-las. As 20 versões mais recentes são mantidas, com numeração estável. Desfaça com o botão "Desfazer" ou Ctrl/⌘+Z fora do editor.
 - Código editável: o painel de código é um editor (somente leitura durante o streaming). Edições mostram o badge "Editado" e uma linha de rascunho, atualizam o preview após um debounce de 500 ms e são salvas como uma versão "Edição manual" antes do próximo refino. Copiar e baixar (`.tsx`) exportam o código editado. Pressione Esc e depois Tab para sair do editor (o Tab não fica preso).
+- Projetos salvos no navegador: cada versão é salva automaticamente no localStorage (até 20 projetos) e o último reabre depois de recarregar; "Projetos" lista todos para abrir ou excluir. Sem conta e sem enviar nada ao servidor.
+- Comparar: diff por linha entre duas versões quaisquer, só com as mudanças ou com o arquivo inteiro.
+- Editor visual: troque a cor de destaque e os tons neutros, os cantos, o espaçamento, o tamanho do texto, as bordas e a fonte sem escrever prompt; o preview acompanha e "Salvar como versão" guarda o resultado (sem chamar o modelo).
+- "Como usar": passos para usar o componente em outro projeto e um `.zip` com o componente e um README.
 - Botão de parar (aborta a requisição ao provedor), alerta de erro amigável com nova tentativa (um refino que falha mantém a versão anterior) e mensagem de rate limit.
 - Interface apenas escura, com fundo de topologia animado e um mascote robô 3D interativo e decorativo em telas largas (a partir de 1536px, oculto quando o sistema pede movimento reduzido); layout mobile com abas Preview / Código.
 
@@ -52,9 +58,11 @@ Obtenha uma chave gratuita do Gemini no [Google AI Studio](https://aistudio.goog
 Variáveis de ambiente opcionais para os rate limits por IP (cada rota tem o seu bucket):
 
 - `RATE_LIMIT_MAX` (padrão 5 requisições) e `RATE_LIMIT_WINDOW_MS` (padrão 60000) para `/api/generate`
+- `DAILY_LIMIT_MAX` (padrão 60 gerações por IP por dia) para `/api/generate`, para que um cliente ou script não gaste toda a cota gratuita do modelo
 - `SUGGEST_RATE_LIMIT_MAX` (padrão 10 requisições) e `SUGGEST_RATE_LIMIT_WINDOW_MS` (padrão 60000) para `/api/suggest`
+- `UPSTASH_REDIS_REST_URL` e `UPSTASH_REDIS_REST_TOKEN` (opcionais, só do servidor): com as duas definidas, os limites são contados no Upstash Redis e compartilhados por todas as instâncias serverless. Sem elas, ou quando o Redis não responde em 1 s, cada instância volta para o limitador em memória. Um banco gratuito do Upstash basta.
 
-Scripts úteis: `npm test`, `npm run typecheck`, `npm run lint`, `npm run test:coverage`, `npm run e2e`, `npm run demo:gif` (grava o GIF de demo; exige `ffmpeg` no PATH).
+Scripts úteis: `npm test`, `npm run typecheck`, `npm run lint`, `npm run test:coverage`, `npm run check:secrets` (depois de um build: nenhuma chave no bundle do navegador nem nos arquivos versionados), `npm run e2e`, `npm run demo:gif` (grava o GIF de demo; exige `ffmpeg` no PATH).
 
 ## Arquitetura
 
@@ -89,7 +97,7 @@ Visão geral:
 
 ## API
 
-As duas rotas recebem corpo JSON, aplicam rate limit por IP e nunca expõem mensagens de erro do provedor.
+As duas rotas recebem corpo JSON (`content-type: application/json`, senão `415`), recusam requisições que o navegador marca como vindas de outro site (`403` `forbidden`, pelo `Sec-Fetch-Site` ou por um `Origin` diferente), aplicam rate limit por IP e nunca expõem mensagens de erro do provedor.
 
 ### POST /api/generate
 
@@ -99,7 +107,7 @@ As duas rotas recebem corpo JSON, aplicam rate limit por IP e nunca expõem mens
 - Erros:
   - `400` corpo inválido;
   - `413` `code_too_large` (código acima de 30.000 caracteres ou corpo acima de 256.000 bytes), verificado antes do rate limit para não gastar cota;
-  - `429` `rate_limited` com header `Retry-After` (em segundos); os erros de cota do próprio provedor também viram `429`;
+  - `429` com header `Retry-After` (em segundos) e um corpo que diz qual limite foi atingido: `rate_limited` (por minuto), `daily_limit` (por dia) ou `quota_exhausted` (a cota gratuita do próprio provedor). O cliente transforma cada um em uma mensagem amigável em pt-BR (por exemplo "Aguarde 42 segundos e tente de novo"), nunca em um erro técnico;
   - `500` chave de API ausente;
   - `502` `generate_failed` quando todos os modelos falham antes do primeiro byte. Falhas depois do primeiro byte fazem o stream dar erro.
 
@@ -107,6 +115,7 @@ As duas rotas recebem corpo JSON, aplicam rate limit por IP e nunca expõem mens
 
 - Requisição: `{ "code": string }`, não pode ficar em branco, no máximo 30.000 caracteres.
 - Resposta: `200` com `{ "suggestions": [{ "label": string, "instruction": string }] }`: no máximo 4 sugestões, rótulos de até 30 caracteres e instruções de até 300.
+- Cache: a resposta para o mesmo código fica na memória da instância (até 200 entradas), então desfazer/refazer e versões repetidas não chamam o modelo nem gastam cota.
 - Rate limit: bucket próprio, separado do generate (`SUGGEST_RATE_LIMIT_MAX`, padrão 10, por `SUGGEST_RATE_LIMIT_WINDOW_MS`, padrão 60000).
 - Timeouts: o servidor tenta `gemini-3.5-flash-lite` e depois `gemini-3.6-flash`, cada um limitado a 5 s, dentro de um orçamento total de 9 s. O cliente espera até 12 s (o orçamento mais 3 s de folga).
 - Erros: `400`, `413` `code_too_large`, `429` com `Retry-After`, `500` chave ausente, `502` `suggest_failed`.
@@ -129,18 +138,19 @@ O que NÃO protege (riscos residuais):
 - Rede de saída: scripts no iframe ainda podem fazer requisições (por exemplo para exfiltrar o que o usuário digita na UI gerada).
 - UI enganosa: o markup gerado pode imitar um formulário de login ou outro conteúdo de phishing dentro do quadro do preview.
 - Cadeia de suprimentos do runtime do preview: Tailwind, React e Babel são arquivos com versões fixas copiados para `public/preview-runtime` e servidos pela própria origem do app, sem hashes de Subresource Integrity.
-- O listener de mensagens do host não verifica a janela de origem; o pior que uma mensagem forjada faz é exibir uma linha de erro em texto.
+- O listener de mensagens do host só aceita mensagens cujo `source` é um dos seus próprios quadros de preview e cuja origem é a origem opaca `"null"` do sandbox; qualquer outra (outra aba, uma extensão, a própria página) é ignorada.
 
 ## Trade-offs
 
 - Free tier do Gemini: sem custo, porém com cota e latência limitadas; os ids dos modelos ficam em um único arquivo para facilitar a troca, e uma cadeia de fallback absorve erros de "alta demanda".
 - iframe srcdoc em vez de Sandpack: o Sandpack foi usado primeiro e removido. Um srcdoc feito à mão mantém explícitos o atributo sandbox e o modelo de origem e elimina uma dependência pesada, ao custo de carregar os scripts do runtime a cada preview.
 - O refino devolve o arquivo inteiro, não um diff: mais simples e robusto a pequenos erros do modelo, mas componentes longos gastam mais tokens por rodada. O limite de 30.000 caracteres em `currentCode` limita isso.
-- Rate limit em memória e best-effort: os contadores vivem em uma instância serverless, não são compartilhados entre instâncias e zeram em cold starts. Um limitador distribuído (PLAT-01, por exemplo Upstash) é a correção real e fica para a v2.
+- Rate limit: com o Upstash configurado os contadores são compartilhados (janelas fixas, um pipeline `INCR` + `PEXPIRE NX` por bucket). Sem ele, ou com o Redis fora do ar, os contadores vivem em uma instância serverless e zeram em cold starts. A checagem de origem e a regra de só aceitar JSON barram outros sites e scripts simples, mas um cliente determinado consegue forjar headers; os limites por minuto e por dia por IP são o que limita o custo.
 - Ressalva para self-hosting: a chave por IP só confia em headers encaminhados (`x-vercel-forwarded-for`, `x-real-ip`, `x-forwarded-for`) quando `VERCEL` está definido; fora da Vercel todos os clientes compartilham um bucket, então use um proxy confiável ou um limitador real à frente.
 - Modelo mock no e2e: os testes são determinísticos, gratuitos e sem chave, mas não exercitam o provedor real. A chave de ativação é só uma variável de ambiente e é ignorada na Vercel Production.
-- Host escuro, preview claro: o site é apenas escuro, mas componentes gerados costumam assumir fundo branco, então o iframe continua claro.
-- Sessão em memória: as versões ficam no estado do React e se perdem ao recarregar.
+- Host escuro, preview claro por padrão: o site é apenas escuro, mas componentes gerados costumam assumir fundo branco, então o iframe começa claro; o botão do preview troca para uma página escura com a classe `dark` no html.
+- Projetos locais: as versões ficam no localStorage deste navegador, então não vão para outro dispositivo e somem se os dados do site forem limpos. As imagens de referência não são salvas (os marcadores ficam no código). Com o armazenamento cheio, os projetos mais antigos saem primeiro.
+- Editor visual por reescrita de classes: ele troca utilitários do Tailwind com expressões regulares, então classes montadas em tempo de execução (template strings, condicionais) ficam como estão.
 - Vercel Hobby: `maxDuration = 60` fica bem dentro do limite de 300 segundos e evita truncar o stream.
 
 ## Estratégia de testes
@@ -150,7 +160,7 @@ O que NÃO protege (riscos residuais):
   - smokes em `e2e/generate.spec.ts`: caminho feliz, erro no meio do stream com nova tentativa, copiar e baixar, abas mobile, refinar e desfazer, refino com falha, restaurar uma versão anterior, editar o código (preview, o refino usa a edição, copiar exporta a edição, Esc e depois Tab);
   - `e2e/journey.spec.ts`: um teste serial do ciclo completo (gerar, refinar, desfazer, edição manual, refinar depois da edição, refino com falha que mantém a versão anterior).
 - A porta do servidor de e2e é `E2E_PORT` (padrão 3100), para máquinas em que essa porta está ocupada.
-- A CI (GitHub Actions) roda dois jobs: `check` (lint, typecheck, cobertura, build) e `e2e` (Playwright). A cobertura é reportada sem limite mínimo.
+- A CI (GitHub Actions) roda dois jobs: `check` (lint, typecheck, cobertura, build) e `e2e` (Playwright). A cobertura tem um mínimo em `vitest.config.ts` (statements 79%, branches 80%, functions 79%, lines 81%) e o build falha abaixo dele. Depois do build, `npm run check:secrets` falha se uma chave de API do Google, uma chave privada ou o valor de uma variável só do servidor aparecer em `.next/static` ou em um arquivo versionado.
 - Os arquivos de docs são regenerados sob demanda e os specs deles são ignorados nos outros casos:
   - `SCREENSHOTS=1 npx playwright test e2e/screenshots.spec.ts` captura `docs/screenshot-dark.png` (apenas escuro);
   - `npm run demo:gif` roda `e2e/demo.spec.ts` com `DEMO=1` (vídeo em 1600x900) e o converte com uma paleta do ffmpeg em duas passadas para `docs/demo.gif` (cerca de 960px de largura, no máximo 3 MB). Exige `ffmpeg` no PATH. `npm run demo:gif -- --convert-only` reconverte a última gravação, e `DEMO_GIF_SPEED`, `DEMO_GIF_FLOOR`, `DEMO_GIF_START` e `DEMO_GIF_MAX` ajustam a conversão.
@@ -164,13 +174,10 @@ O que NÃO protege (riscos residuais):
 
 ## O que foi cortado e roadmap v2
 
-Entregue na v1.1: refinamento iterativo, histórico de versões e código editável.
+Entregue na v1.1: refinamento iterativo, histórico de versões e código editável. Entregue na v1.2: rate limit compartilhado (Upstash, opcional), mensagens amigáveis de limite, galeria de exemplos, guia de design para o modelo, projetos locais, diff de versões, tamanhos e página escura no preview, download com guia de uso e editor visual.
 
 - Autenticação e cotas por usuário
-- Sessões persistentes (as versões sobrevivem a um reload)
-- Visualização de diff entre versões
-- Rate limit distribuído (PLAT-01)
-- Componentes com múltiplos arquivos
+- Projetos com múltiplos arquivos (planejado para a v1.3)
 - Seletor de modelo
 
 ## Licença

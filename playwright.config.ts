@@ -23,6 +23,6 @@ export default defineConfig({
     reuseExistingServer: false,
     timeout: 240000,
     // Test-only flags: never put these in .env files or Vercel (D-02).
-    env: { PORT: String(port), UIFORGE_E2E_MOCK: "1", RATE_LIMIT_MAX: "1000", SUGGEST_RATE_LIMIT_MAX: "1000" },
+    env: { PORT: String(port), UIFORGE_E2E_MOCK: "1", RATE_LIMIT_MAX: "1000", DAILY_LIMIT_MAX: "100000", SUGGEST_RATE_LIMIT_MAX: "1000" },
   },
 });

@@ -23,12 +23,18 @@ The site is dark-only. Both assets are captured with the mock model, so the comp
 
 ## Features
 
-- Prompt (up to 2,000 characters) with example chips; the code streams in token by token from Gemini.
-- Live preview of the generated component inside a sandboxed iframe.
+- Prompt (up to 2,000 characters) with an example gallery: 24 complete, ready-to-generate prompts in six categories (Cards, Formulários, Dashboards, Tabelas, Menus, Básicos); the code streams in token by token from Gemini.
+- Up to 4 reference images (picked, pasted or dropped) sent along with the prompt.
+- A design guide in the system prompt (one accent color, spacing scale, radius, focus states, realistic pt-BR content, responsive layout, `dark:` variants, accessibility) for more polished, consistent results.
+- Live preview of the generated component inside a sandboxed iframe, at Desktop, Tablet (768px) or Celular (375px) width and on a light or dark page (`dark:` classes follow it).
 - Iterative refinement: after v1 the input switches to "Refinar" and sends the current code plus your instruction; the model returns the whole updated component, which becomes the next version. "Novo componente" starts over, and asks for confirmation when there are several versions or manual edits.
 - AI suggestion chips: after each version, `/api/suggest` proposes up to 4 short changes; clicking a chip prefills the instruction (a fixed list is used when the model is unavailable).
 - Version history: a list of every version (prompt, refine instruction or "Edição manual"). You can restore any version; later versions are shown dimmed, and refining from an earlier one says so ("Refinar a partir da vN") before discarding them. The latest 20 versions are kept, with stable numbering. Undo with the "Desfazer" button or Ctrl/⌘+Z outside the editor.
 - Editable code: the code panel is an editor (read-only while streaming). Edits show an "Editado" badge and a draft row, update the preview after a 500 ms debounce, and are saved as an "Edição manual" version before the next refine. Copy and download (`.tsx`) export the edited code. Press Esc then Tab to leave the editor (Tab is not trapped).
+- Projects saved in the browser: every version is auto-saved in localStorage (up to 20 projects) and the last one reopens after a reload; "Projetos" lists them to open or delete. No account, nothing sent to the server.
+- Comparar: a line diff between any two versions, collapsed to the changes or the whole file.
+- Visual editor: change the accent and neutral colors, corner radius, spacing, text size, borders and font without a prompt; the preview follows and "Salvar como versão" keeps it (no model request).
+- "Como usar": steps to use the component in another project and a `.zip` with the component and a README.
 - Stop button (aborts the provider request), friendly error alert with retry (a failed refine keeps the previous version), and a rate-limit message.
 - Dark-only UI with an animated topology background and a decorative interactive 3D robot mascot on wide screens (1536px and up, hidden when reduced motion is requested); mobile layout with Preview / Code tabs.
 
@@ -142,8 +148,9 @@ What it does NOT protect against (residual risks):
 - Rate limiting: with Upstash configured the counters are shared (fixed windows, one `INCR` + `PEXPIRE NX` pipeline per bucket). Without it, or when Redis is down, counters live in one serverless instance and reset on cold starts. The origin check and the JSON-only rule stop other sites and naive scripts, but a determined client can forge headers; the per-IP minute and daily limits are what bound the cost.
 - Self-hosted caveat: the per-IP key only trusts forwarded headers (`x-vercel-forwarded-for`, `x-real-ip`, `x-forwarded-for`) when `VERCEL` is set; elsewhere all clients share one bucket, so put a trusted proxy or a real limiter in front.
 - Mock model in e2e: tests are deterministic, free and keyless, but they do not exercise the real provider. The switch is an env var only and is ignored on Vercel Production.
-- Dark host, light preview: the site is dark-only, but generated components usually assume a white background, so the iframe stays light.
-- Session in memory: versions live in React state and are lost on reload.
+- Dark host, light preview by default: the site is dark-only, but generated components usually assume a white background, so the iframe starts light; the preview toggle switches to a dark page and the html `dark` class.
+- Local projects: versions are saved in this browser's localStorage, so they do not follow you to another device and clearing site data removes them. Reference images are not saved (the tokens stay in the code). When storage is full, the oldest projects are dropped first.
+- Visual editor by class rewriting: it changes Tailwind utilities with regular expressions, so classes built at runtime (template strings, conditionals) are left as they are.
 - Vercel Hobby: `maxDuration = 60` stays well inside the 300 second limit and avoids truncating the stream.
 
 ## Testing strategy
@@ -167,12 +174,10 @@ What it does NOT protect against (residual risks):
 
 ## What was cut and v2 roadmap
 
-Shipped in v1.1: iterative refinement, version history and editable code.
+Shipped in v1.1: iterative refinement, version history and editable code. Shipped in v1.2: shared rate limits (Upstash, optional), friendly limit messages, an example gallery, a design guide for the model, local projects, version diff, preview sizes and dark page, the usage guide download and the visual editor.
 
 - Authentication and per-user quotas
-- Persistent sessions (versions survive a reload)
-- Diff view between versions
-- Multi-file components
+- Multi-file projects (planned for v1.3)
 - Model selector
 
 ## License
