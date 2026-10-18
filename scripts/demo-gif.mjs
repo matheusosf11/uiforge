@@ -81,9 +81,12 @@ if (probe.error || probe.status !== 0) {
 }
 
 if (!convertOnly) {
-  const run = spawnSync("npx", ["playwright", "test", "e2e/demo.spec.ts"], {
+  // One constant command string through the shell: npx is npx.cmd on Windows,
+  // which Node refuses to spawn without a shell, and an args array combined
+  // with shell: true is deprecated (DEP0190).
+  const run = spawnSync("npx playwright test e2e/demo.spec.ts", {
     stdio: "inherit",
-    shell: process.platform === "win32",
+    shell: true,
     env: { ...process.env, DEMO: "1" },
   });
   if (run.error || run.status !== 0) {
