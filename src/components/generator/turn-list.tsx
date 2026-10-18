@@ -95,7 +95,12 @@ export function TurnList({
             Versões mais antigas descartadas (limite de {MAX_VERSIONS})
           </p>
         ) : null}
-        <ol aria-label="Histórico de versões" className="flex flex-col gap-1">
+        <ol
+          // WR-02: list-style none drops the implicit list role in WebKit.
+          role="list"
+          aria-label="Histórico de versões"
+          className="flex flex-col gap-1"
+        >
           {versions.map((v, index) => {
             const position =
               index < cursor ? "before" : index === cursor ? "current" : "later";

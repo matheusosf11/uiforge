@@ -187,6 +187,12 @@ describe("TurnList", () => {
     expect(buttons[0]).not.toHaveAttribute("aria-current");
   });
 
+  it("keeps an explicit list role on the ol (WR-02, WebKit list-style none)", () => {
+    renderList();
+    expect(list().tagName).toBe("OL");
+    expect(list()).toHaveAttribute("role", "list");
+  });
+
   it("marks versions after the cursor as later and restores by id", async () => {
     const { props } = renderList({ cursor: 0 });
     const v2 = screen.getByRole("button", {
