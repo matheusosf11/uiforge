@@ -65,7 +65,14 @@
   3. After a restore, later versions appear dimmed and the UI shows "Refinar a partir da vN"; refining then discards the versions after it
   4. Only the latest 20 versions are kept (oldest dropped)
   5. Screen-reader and keyboard users can use the list: semantic list, `aria-current` on the active version, descriptive restore labels, status announced via `aria-live`, focus managed after restore/reset
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+- [ ] 07-01-PLAN.md — Reducer RESTORE, stable numbering (droppedCount), selectors, IN-01 guard; hook restore()
+- [ ] 07-02-PLAN.md — PromptForm turnList slot + base notice; CodeView scrollResetKey
+- [ ] 07-03-PLAN.md — TurnList / TurnItem presentational components (disclosure, cap line, container scroll)
+- [ ] 07-04-PLAN.md — Shell wiring, stable-number session bar and status, integration tests
+- [ ] 07-05-PLAN.md — E2E counter strings + restore smoke, single Playwright run
 **UI hint**: yes
 
 ### Phase 8: Editable Code View

@@ -394,7 +394,10 @@ Here `text` is `version.source === "manual" ? "Edição manual" : version.instru
 | A1 | D-17 "come from the version id" is satisfied by a stable display number (`droppedCount + index + 1`) rather than the raw `id`, because the raw id shows v3 after reset and gaps after truncation | Pattern 2 / Pitfall 1 | If the user truly wants raw ids, gaps (v1, v3) appear, numbering continues after reset, and `generator-shell.test.tsx:232,268` change. Low risk: the literal reading contradicts the e2e expectation "Pronto — v2" after undo + refine. |
 | A2 | Code-panel scroll-to-top is keyed to navigation notices only, not to commit | Pattern 5 | Minor UX: if a scroll-to-top on commit is also wanted, key it to `committed.id` alone |
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+RESOLVED: cap line text is "Versões mais antigas descartadas (limite de 20)" shown when `droppedCount > 0`; A1 resolved as stable display number `droppedCount + index + 1` (07-CONTEXT D-17); A2 accepted (code panel scrolls to top on undo/restore only).
+
 
 1. **The cap line copy.** The UI-SPEC says "Versões mais antigas descartadas (limite de 20)" and CONTEXT says "Versões mais antigas descartadas". Recommendation: use the UI-SPEC text (it is approved), via `MAX_VERSIONS` interpolation.
 

@@ -117,7 +117,7 @@ Structure (default):
 <div class="mb-4">
   [mobile only] disclosure button
   <div id="turn-list-region" class="max-h-44 max-md:max-h-60 overflow-y-auto overscroll-contain rounded-lg border border-border p-1 [collapsed: max-md:hidden]">
-    [cap line, only when versions[0].id > 1]
+    [cap line, only when droppedCount > 0]
     <ol aria-label="Histórico de versões" class="flex flex-col gap-1">
       <li> TurnItem (one per kept version, oldest first) </li>
       <li> transient item (gerando or erro), at most one, always last </li>
@@ -146,7 +146,7 @@ Shared row layout: `flex w-full min-w-0 items-center gap-2 rounded-md border-l-2
 
 | Slot | Content | Classes |
 |------|---------|---------|
-| Label | `v{id}` (stable id, D-17) | `min-w-7 shrink-0 font-medium tabular-nums text-foreground` |
+| Label | `v{n}` (stable display number = droppedCount + index + 1, D-17) | `min-w-7 shrink-0 font-medium tabular-nums text-foreground` |
 | Text | instruction (v1 = original prompt). For `source: "manual"`, show `Edição manual` (D-05; Phase 8 creates these) | `min-w-0 flex-1 truncate text-muted-foreground` (current item: `text-foreground`) |
 | Badge (current only) | `atual` | `inline-flex h-4 shrink-0 items-center rounded-sm bg-background px-1 text-xs leading-4 font-medium text-foreground` |
 | Status icon | see the state table | `size-4 shrink-0` (16px), `aria-hidden="true"` |
@@ -183,11 +183,11 @@ Rules:
 | 2 or more (vX..vY) | `Refinar a partir da v{N} — v{X} a v{Y} serão descartadas` |
 | exactly 1 (vX) | `Refinar a partir da v{N} — v{X} será descartada` |
 
-N, X and Y are stable ids.
+N, X and Y are stable display numbers (D-17).
 
 ### 6. Session bar adaptation (D-17)
 
-- Counter changes from `v{N} de {M}` to `v{N} · {M} versões`, where N is the stable id of the current version and M is `versions.length`. Singular: `v{N} · 1 versão`. Classes unchanged (`text-xs text-muted-foreground tabular-nums`).
+- Counter changes from `v{N} de {M}` to `v{N} · {M} versões`, where N is the stable display number of the current version and M is `versions.length`. Singular: `v{N} · 1 versão`. Classes unchanged (`text-xs text-muted-foreground tabular-nums`).
 - `Desfazer` and `Novo componente` are unchanged. Undo is cursor − 1 from whatever is current (D-14).
 
 ### 7. Restore behavior (D-12, D-13, D-16, D-19)
@@ -206,13 +206,13 @@ After reset ("Novo componente"): the list unmounts, the disclosure goes back to 
 
 ### 8. Status line (D-20, D-17)
 
-Same single `aria-live="polite"` region. All numbers are stable ids.
+Same single `aria-live="polite"` region. All numbers are stable display numbers (droppedCount + index + 1), never raw version ids.
 
 | Situation | Text |
 |-----------|------|
-| Commit | `Pronto — v{id}` (e2e string kept) |
-| Undo or restore to an earlier version | `Voltou para v{id}` (e2e string kept) |
-| Restore to a later, dimmed version | `Foi para v{id}` |
+| Commit | `Pronto — v{n}` (e2e string kept) |
+| Undo or restore to an earlier version | `Voltou para v{n}` (e2e string kept) |
+| Restore to a later, dimmed version | `Foi para v{n}` |
 | Click on the current item | no change |
 | Refining / first generation / reset / stop / error | unchanged from Phase 6 (`Refinando…`, `Gerando…`, `Novo componente iniciado`, empty, empty) |
 
@@ -277,4 +277,4 @@ The only new motion is the `Loader2` spin on the gerando item (`motion-reduce:an
 - [x] Dimension 5 Spacing: FLAG (resolved: mb-4, h-8 single source, max-h note)
 - [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved 2026-10-18
