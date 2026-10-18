@@ -129,7 +129,7 @@ Structure (default):
 - Order: oldest at the top, newest at the bottom, next to the field (D-03).
 - Own scroll; the page does not grow beyond about 5 rows (D-01).
 - **Auto-scroll (D-03):** after each commit, undo, restore and when a transient item appears, scroll the list region so the current item (or the transient item, if any) is visible. Scroll **only the list container**, by adjusting `scrollTop` so the item is fully inside it (an equivalent of `block: "nearest"`). Do not call a bare `element.scrollIntoView()`, because that also scrolls the page and would jump the mobile viewport. No smooth scrolling; the jump is instant, so no reduced-motion variant is needed.
-- **Cap line (D-17):** a `<p class="px-2 py-1 text-xs text-muted-foreground">Versões mais antigas descartadas (limite de 20)</p>`, rendered inside the scroll region above the `<ol>`. It is not a list item, so it does not count as a turn. It is shown when the oldest kept version id is greater than 1.
+- **Cap line (D-17):** a `<p class="px-2 py-1 text-xs text-muted-foreground">Versões mais antigas descartadas (limite de 20)</p>`, rendered inside the scroll region above the `<ol>`. It is not a list item, so it does not count as a turn. It is shown when `droppedCount > 0` (the cap has evicted at least one version). Do not test version ids: they are internal and keep counting across resets and regenerations.
 
 ### 3. Mobile disclosure (D-02)
 
