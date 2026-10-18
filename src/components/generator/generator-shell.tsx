@@ -109,6 +109,16 @@ export function GeneratorShell() {
     if (outcome === "committed") setPrompt("");
   }
 
+  async function handleRetry() {
+    const instruction = error?.instruction ?? "";
+    const outcome = await session.retry();
+    // D-02: a committed retry clears the field like a submit, unless the user
+    // already edited it into a different draft meanwhile.
+    if (outcome === "committed") {
+      setPrompt((p) => (p.trim() === instruction.trim() ? "" : p));
+    }
+  }
+
   function doReset() {
     session.reset();
     suggestions.reset();
@@ -200,7 +210,7 @@ export function GeneratorShell() {
                 variant="outline"
                 size="sm"
                 className="text-xs"
-                onClick={() => void session.retry()}
+                onClick={() => void handleRetry()}
                 disabled={busy}
               >
                 <RotateCcw /> Tentar de novo

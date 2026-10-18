@@ -202,6 +202,8 @@ describe("GeneratorShell", () => {
     expect(genBodies).toHaveLength(3);
     expect(genBodies[2].currentCode).toBe(genBodies[1].currentCode);
     expect(genBodies[2].prompt).toBe("azul");
+    // D-02: the committed retry clears the field like a normal submit.
+    expect(screen.getByRole("textbox")).toHaveValue("");
   });
 
   it("preview retry on v1 regenerates without currentCode, on v2 from v1", async () => {
