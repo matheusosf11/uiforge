@@ -99,24 +99,59 @@ export function useGeneratorSession(opts?: { fetchImpl?: typeof fetch }) {
     [],
   );
 
+  // D-07: save an edited draft as a "manual" version before acting on it.
+  // Non-strings are ignored (an onClick can still pass a MouseEvent here).
+  // The ref is advanced eagerly so later calls in the same handler (run,
+  // UNDO, RESTORE) see the manual version; this is safe because the reducer
+  // is pure and React applies the queued actions in order, so the next render
+  // recomputes exactly this state.
+  const commitManual = useCallback((code: unknown): Version | null => {
+    if (typeof code !== "string") return null;
+    if (inFlightRef.current !== null || isBusy(stateRef.current)) return null;
+    const action = { type: "COMMIT_MANUAL", code } as const;
+    const next = sessionReducer(stateRef.current, action);
+    if (next === stateRef.current) return null;
+    stateRef.current = next;
+    dispatch(action);
+    return committedVersion(next);
+  }, []);
+
+  // EDIT-06: refine from the edited code. Ignored sends never commit a draft;
+  // an oversized draft is committed, then run() rejects it as too_large.
   const send = useCallback(
-    (text: string) => run(text, committedVersion(stateRef.current)),
-    [run],
+    (text: string, draft?: string | null): Promise<SendResult> => {
+      if (
+        !text.trim() ||
+        inFlightRef.current !== null ||
+        isBusy(stateRef.current)
+      ) {
+        return Promise.resolve("ignored");
+      }
+      commitManual(draft);
+      return run(text, committedVersion(stateRef.current));
+    },
+    [run, commitManual],
   );
 
   // Re-send the failed instruction against the base it originally targeted
-  // (null base = first generation, retried without currentCode).
-  const retry = useCallback(async (): Promise<SendResult> => {
-    const s = stateRef.current;
-    const error = s.error;
-    if (!error || error.kind === "too_large") return "ignored";
-    const base =
-      error.baseId === null
-        ? null
-        : (s.versions.find((v) => v.id === error.baseId) ??
-          committedVersion(s));
-    return run(error.instruction, base);
-  }, [run]);
+  // (null base = first generation, retried without currentCode). With a
+  // draft, the edit is committed and becomes the base so it is never lost.
+  const retry = useCallback(
+    async (draft?: string | null): Promise<SendResult> => {
+      const s = stateRef.current;
+      const error = s.error;
+      if (!error || error.kind === "too_large") return "ignored";
+      const manual = commitManual(draft);
+      if (manual) return run(error.instruction, manual);
+      const base =
+        error.baseId === null
+          ? null
+          : (s.versions.find((v) => v.id === error.baseId) ??
+            committedVersion(s));
+      return run(error.instruction, base);
+    },
+    [run, commitManual],
+  );
 
   // Preview runtime-error retry: redo the committed version from its own
   // base. v1 regenerates from the original prompt without currentCode; vN
@@ -144,12 +179,21 @@ export function useGeneratorSession(opts?: { fetchImpl?: typeof fetch }) {
     dispatch({ type: "ABORT", id });
   }, []);
 
-  const undo = useCallback(() => dispatch({ type: "UNDO" }), []);
+  const undo = useCallback(
+    (draft?: string | null) => {
+      commitManual(draft);
+      dispatch({ type: "UNDO" });
+    },
+    [commitManual],
+  );
 
   // The reducer ignores RESTORE while pending, so no busy check here.
   const restore = useCallback(
-    (versionId: number) => dispatch({ type: "RESTORE", versionId }),
-    [],
+    (versionId: number, draft?: string | null) => {
+      commitManual(draft);
+      dispatch({ type: "RESTORE", versionId });
+    },
+    [commitManual],
   );
 
   const reset = useCallback(() => {
