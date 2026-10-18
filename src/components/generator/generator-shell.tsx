@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { FilePlus2, FolderOpen, RotateCcw } from "lucide-react";
-import { CodeView } from "@/components/generator/code-view";
+import { CodeView, type CodeMode } from "@/components/generator/code-view";
 import { DiscardDraftDialog } from "@/components/generator/discard-draft-dialog";
 import { NewComponentDialog } from "@/components/generator/new-component-dialog";
 import { PanelBoard } from "@/components/generator/panel-board";
@@ -18,6 +18,7 @@ import { useSuggestions } from "@/components/generator/use-suggestions";
 import { useMediaQuery } from "@/components/generator/use-media-query";
 import { useUndoShortcut } from "@/components/generator/use-undo-shortcut";
 import { VersionDiff } from "@/components/generator/version-diff";
+import { VisualEditor } from "@/components/generator/visual-editor";
 import { Button } from "@/components/ui/button";
 import {
   CODE_TOO_LARGE_MESSAGE,
@@ -123,7 +124,8 @@ export function GeneratorShell() {
   });
   const [projectsOpen, setProjectsOpen] = useState(false);
   const projectsBtnRef = useRef<HTMLButtonElement | null>(null);
-  const [comparing, setComparing] = useState(false);
+  // Code panel: editor, version diff or visual editor.
+  const [codeMode, setCodeMode] = useState<CodeMode>("code");
 
   const suggestions = useSuggestions(
     committed ? { id: committed.id, code: committed.code } : null,
@@ -232,6 +234,14 @@ export function GeneratorShell() {
   // versionKey so a discard does not trigger the scroll reset.
   const [discards, setDiscards] = useState(0);
   const historyKey = versionKey === null ? null : `${versionKey}:d${discards}`;
+
+  // Visual editor: the edits live in the draft (the preview follows it) and
+  // become a manual version here.
+  function saveVisualEdit() {
+    if (!draftCode) return;
+    session.commitDraft(draftCode);
+    setDraft(null);
+  }
 
   function handleDiscard() {
     setDraft(null);
@@ -410,7 +420,7 @@ export function GeneratorShell() {
     suggestions.reset();
     setHistoryOpen(false);
     setPreviewImages([]);
-    setComparing(false);
+    setCodeMode("code");
     // The current project stays saved; the next commit starts a new one, and
     // a reload before that opens the empty generator.
     setProjectId(newProjectId());
@@ -444,7 +454,7 @@ export function GeneratorShell() {
     suggestions.reset();
     setPreviewImages([]);
     setHistoryOpen(false);
-    setComparing(false);
+    setCodeMode("code");
     setProjectsOpen(false);
   }
 
@@ -648,8 +658,27 @@ export function GeneratorShell() {
           />
         ) : null
       }
-      comparing={comparing && versions.length > 1 && !pending}
-      onComparingChange={setComparing}
+      visual={
+        committed ? (
+          <VisualEditor
+            // A new version (saved edit, refine, restore) starts over from it.
+            key={`${projectId}:${committed.id}:${discards}`}
+            base={draftCode ?? committed.code}
+            onChange={handleEditorChange}
+            onSave={saveVisualEdit}
+            canSave={dirty}
+            disabled={busy}
+          />
+        ) : null
+      }
+      mode={
+        pending ||
+        (codeMode === "compare" && versions.length < 2) ||
+        (codeMode === "visual" && !committed)
+          ? "code"
+          : codeMode
+      }
+      onModeChange={setCodeMode}
     />
   );
 

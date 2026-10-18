@@ -23,10 +23,10 @@ export default defineConfig({
       // so a change that drops coverage noticeably fails the build. Raise it
       // as coverage grows; never lower it to make a change pass.
       thresholds: {
-        statements: 75,
-        branches: 78,
-        functions: 74,
-        lines: 77,
+        statements: 79,
+        branches: 80,
+        functions: 79,
+        lines: 81,
       },
     },
   },

@@ -1498,3 +1498,51 @@ describe("Comparar versions", () => {
     expect(screen.getByLabelText("Editor de código")).toBeInTheDocument();
   });
 });
+
+describe("visual editor", () => {
+  it("restyles the component without a prompt and saves it as a version", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await generateFirst(user);
+    await screen.findByText("Pronto — v1");
+    const requests = genBodies.length;
+
+    await user.click(screen.getByRole("button", { name: "Visual" }));
+    expect(screen.getByRole("button", { name: "Visual" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("radio", { name: "Índigo (atual)" })).toBeChecked();
+    expect(screen.getByRole("button", { name: "Salvar como versão" })).toBeDisabled();
+
+    await user.click(screen.getByRole("radio", { name: "Esmeralda" }));
+    await user.click(screen.getByRole("radio", { name: "Serifada" }));
+    fireEvent.change(screen.getByRole("slider", { name: "Cantos" }), { target: { value: "-5" } });
+    expect(screen.getByText("Editado", { exact: true })).toBeInTheDocument();
+    // The preview follows the draft after the debounce.
+    await waitFor(() => {
+      const code = screen.getByTestId("preview").getAttribute("data-code") ?? "";
+      expect(code).toContain("bg-emerald-600");
+      expect(code).toContain('className="font-serif mx-auto');
+      // Clamped to -3 steps: rounded-xl becomes rounded-sm.
+      expect(code).toContain("max-w-sm rounded-sm border");
+    });
+
+    await user.click(screen.getByRole("button", { name: "Salvar como versão" }));
+    expect(await screen.findByText("Edição salva como v2")).toBeInTheDocument();
+    expect(screen.getByText("v2 · 2 versões")).toBeInTheDocument();
+    // The panel starts over from the saved version, and no request was made.
+    expect(screen.getByRole("radio", { name: "Esmeralda (atual)" })).toBeChecked();
+    expect(genBodies).toHaveLength(requests);
+  });
+
+  it("Restaurar original drops the visual edits", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await generateFirst(user);
+    await screen.findByText("Pronto — v1");
+    await user.click(screen.getByRole("button", { name: "Visual" }));
+    await user.click(screen.getByRole("radio", { name: "Sem borda" }));
+    expect(screen.getByText("Editado", { exact: true })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Restaurar original" }));
+    expect(screen.queryByText("Editado", { exact: true })).toBeNull();
+    expect(screen.getByRole("radio", { name: "Sem borda" })).not.toBeChecked();
+  });
+});

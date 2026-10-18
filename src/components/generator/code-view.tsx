@@ -4,7 +4,15 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 import { Highlight, themes } from "prism-react-renderer";
 import Editor from "react-simple-code-editor";
-import { BookOpen, Check, Copy, Download, GitCompare, X } from "lucide-react";
+import {
+  BookOpen,
+  Check,
+  Copy,
+  Download,
+  GitCompare,
+  Paintbrush,
+  X,
+} from "lucide-react";
 import { useTheme } from "next-themes";
 import { UsageDialog } from "@/components/generator/usage-dialog";
 import { Button } from "@/components/ui/button";
@@ -12,6 +20,9 @@ import { componentFilename } from "@/lib/download-filename";
 import { cn } from "@/lib/utils";
 
 type CopyState = "idle" | "copied" | "failed";
+
+/** What the panel shows: the editor, a version diff or the visual editor. */
+export type CodeMode = "code" | "compare" | "visual";
 
 type EditorHandle = {
   session: {
@@ -74,8 +85,9 @@ export function CodeView({
   onDiscard,
   historyKey,
   compare = null,
-  comparing = false,
-  onComparingChange,
+  visual = null,
+  mode = "code",
+  onModeChange,
 }: {
   /** Value shown: the draft, the committed version or the streaming code. */
   code: string;
@@ -94,8 +106,10 @@ export function CodeView({
   historyKey?: string | number | null;
   /** Version comparison shown instead of the editor; null hides "Comparar". */
   compare?: ReactNode;
-  comparing?: boolean;
-  onComparingChange?: (comparing: boolean) => void;
+  /** Visual editor shown instead of the editor; null hides "Visual". */
+  visual?: ReactNode;
+  mode?: CodeMode;
+  onModeChange?: (mode: CodeMode) => void;
 }) {
   const readOnly = readOnlyProp ?? (busy || !onChange);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -253,18 +267,36 @@ export function CodeView({
           ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
-          {compare !== null && onComparingChange ? (
+          {visual !== null && onModeChange ? (
             <Button
               type="button"
               variant="outline"
               size="sm"
               className={cn(
                 "text-xs max-md:min-h-11",
-                comparing && "bg-muted text-foreground",
+                mode === "visual" && "bg-muted text-foreground",
               )}
-              aria-pressed={comparing}
+              aria-pressed={mode === "visual"}
               disabled={busy}
-              onClick={() => onComparingChange(!comparing)}
+              onClick={() => onModeChange(mode === "visual" ? "code" : "visual")}
+              title="Ajustar cores, cantos, espaçamento e fonte sem prompt"
+            >
+              <Paintbrush aria-hidden />
+              Visual
+            </Button>
+          ) : null}
+          {compare !== null && onModeChange ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className={cn(
+                "text-xs max-md:min-h-11",
+                mode === "compare" && "bg-muted text-foreground",
+              )}
+              aria-pressed={mode === "compare"}
+              disabled={busy}
+              onClick={() => onModeChange(mode === "compare" ? "code" : "compare")}
               title="Comparar duas versões"
             >
               <GitCompare aria-hidden />
@@ -324,8 +356,10 @@ export function CodeView({
           </Button>
         </div>
       </div>
-      {comparing && compare !== null ? (
+      {mode === "compare" && compare !== null ? (
         compare
+      ) : mode === "visual" && visual !== null ? (
+        visual
       ) : showEditor ? (
         <>
           <label htmlFor={EDITOR_ID} className="sr-only">
