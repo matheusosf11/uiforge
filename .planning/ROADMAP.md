@@ -21,7 +21,7 @@
 
 - [x] **Phase 5: Refine API Contract & Edit Prompt** - Stateless `currentCode` contract, edit-mode prompt returning the full component, mock model extended for refine (completed 2026-10-17)
 - [x] **Phase 6: Session Core & Refine Loop** - Pure session reducer plus shell that refines by default, keeps previous version on failure, undo, reset and shortcuts (completed 2026-10-18)
-- [ ] **Phase 7: Turn List & Version Navigation** - Accessible mini-chat list of turns that restores any version and shows the refine base
+- [x] **Phase 7: Turn List & Version Navigation** - Accessible mini-chat list of turns that restores any version and shows the refine base (completed 2026-10-18)
 - [ ] **Phase 8: Editable Code View** - Syntax-highlighted editable code that live-updates preview and feeds the next refinement
 - [ ] **Phase 9: E2E, Demo GIF & Docs** - Full refine journey covered by e2e, recorded demo GIF, PT/EN READMEs updated
 
@@ -72,7 +72,7 @@ Plans:
 - [x] 07-02-PLAN.md — PromptForm turnList slot + base notice; CodeView scrollResetKey
 - [x] 07-03-PLAN.md — TurnList / TurnItem presentational components (disclosure, cap line, container scroll)
 - [x] 07-04-PLAN.md — Shell wiring, stable-number session bar and status, integration tests
-- [ ] 07-05-PLAN.md — E2E counter strings + restore smoke, single Playwright run
+- [x] 07-05-PLAN.md — E2E counter strings + restore smoke, single Playwright run
 **UI hint**: yes
 
 ### Phase 8: Editable Code View
@@ -109,6 +109,6 @@ Plans:
 | 4. Quality Gate & Deploy | v1.0 | 8/8 | Complete | 2026-10-16 |
 | 5. Refine API Contract & Edit Prompt | v1.1 | 2/2 | Complete    | 2026-10-17 |
 | 6. Session Core & Refine Loop | v1.1 | 7/7 | Complete    | 2026-10-18 |
-| 7. Turn List & Version Navigation | v1.1 | 4/5 | In Progress|  |
+| 7. Turn List & Version Navigation | v1.1 | 5/5 | Complete   | 2026-10-18 |
 | 8. Editable Code View | v1.1 | 0/0 | Not started | - |
 | 9. E2E, Demo GIF & Docs | v1.1 | 0/0 | Not started | - |
