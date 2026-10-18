@@ -7,13 +7,15 @@ import { test, expect } from "@playwright/test";
 const IFRAME = 'iframe[title="Live preview"]';
 const PAUSE = 1200;
 
+// 1600x900 so the robot mascot (>= 1536px) is on screen (D-06). Top-level:
+// Playwright does not allow use({ video }) inside a describe group.
+test.use({
+  viewport: { width: 1600, height: 900 },
+  video: { mode: "on", size: { width: 1600, height: 900 } },
+});
+
 test.describe("demo recording", () => {
   test.skip(process.env.DEMO !== "1", "set DEMO=1 to record the demo");
-  // 1600x900 so the robot mascot (>= 1536px) is on screen (D-06).
-  test.use({
-    viewport: { width: 1600, height: 900 },
-    video: { mode: "on", size: { width: 1600, height: 900 } },
-  });
 
   test("generate, refine, undo and edit", async ({ page }) => {
     test.setTimeout(120000);
