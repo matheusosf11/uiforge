@@ -39,6 +39,43 @@
 
 ---
 
+## Milestone: v1.1 — Refinamento Iterativo
+
+**Shipped:** 2026-10-18 (local; push/deploy pending)
+**Phases:** 5 | **Plans:** 23 | **Commits:** ~175 over 2 days
+
+### What Was Built
+- Stateless refine API (`currentCode` + instruction → full component) with size limit, injection-safe framing and truncation detection
+- Session reducer with undo/restore, 20-version cap, accessible turn list and suggestion chips (`/api/suggest`)
+- Editable code view feeding the next refinement; double-buffered preview
+- Journey e2e, reproducible demo GIF pipeline, PT/EN READMEs; dark-only UI with topology background and interactive robot mascot
+
+### What Worked
+- A pure reducer first (Phase 6) made Phases 7–8 mostly UI wiring with strong unit coverage (93 → 419 tests)
+- Running e2e from an isolated `git archive` copy on its own port avoided clashing with the user's dev servers
+- Code review + fixer after every phase kept warnings from piling up
+
+### What Was Inefficient
+- `gsd-sdk` STATE commands and summary extraction often failed or produced junk; STATE/MILESTONES fixed by hand
+- Decision-coverage gate only reads `must_haves.truths`, so plans needed D-ids repeated there
+- Out-of-flow UI requests (robot, background, dark-only) landed mid-milestone and later forced test scoping fixes (status region vs robot bubble)
+
+### Patterns Established
+- Status assertions scoped to the `[aria-live="polite"][aria-atomic="true"]` region
+- Decorative 3D is aria-hidden, lazy-loaded and gated by width + reduced-motion
+- `E2E_PORT` + isolated copies for e2e when local ports are busy
+
+### Key Lessons
+1. Model UI/state logic as a pure reducer before building components on it.
+2. Keep decorative layers out of the accessibility tree and out of test selectors from day one.
+3. Verify a third-party 3D scene's API (e.g. `setZoom`) against the actual scene before designing around it.
+
+### Cost Observations
+- Model profile: balanced
+- Notable: a large part ran autonomously overnight with the user's authorization
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -46,13 +83,16 @@
 | Milestone | Commits | Phases | Key Change |
 |-----------|---------|--------|------------|
 | v1.0 | 125 | 4 | Baseline: per-phase code review + UAT |
+| v1.1 | ~175 | 5 | Code review + auto-fixer per phase; isolated e2e runs |
 
 ### Cumulative Quality
 
 | Milestone | Tests | Coverage | Zero-Dep Additions |
 |-----------|-------|----------|-------------------|
 | v1.0 | 93 unit + e2e | — | self-hosted preview runtime |
+| v1.1 | 419 unit + journey e2e | — | react-simple-code-editor (small) |
 
 ### Top Lessons (Verified Across Milestones)
 
-1. (to be confirmed by v1.1+)
+1. Per-phase code review catches real bugs before they compound (v1.0, v1.1).
+2. Automated GSD extraction (summaries/state) needs manual review at milestone close (v1.0, v1.1).

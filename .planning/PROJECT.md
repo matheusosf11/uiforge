@@ -4,17 +4,22 @@
 
 UIForge is an AI-powered UI component generator (a focused "v0 lite"): the user describes a component in natural language and the app generates self-contained React + Tailwind code in real time (streaming) and renders it live in a secure sandboxed preview, with an editor and copy/download actions. It is a portfolio showcase project built by and for front-end engineers to demonstrate modern web and AI-integration skills to recruiters at large companies.
 
-## Current Milestone: v1.1 Refinamento Iterativo
+## Current State
+
+**v1.1 Refinamento Iterativo completed 2026-10-18** (local; not yet pushed/deployed). Users generate a component, then refine it with follow-up prompts, navigate an in-memory version history, edit the code by hand and keep refining from their edits. The UI is dark-only with a topology background and an interactive 3D robot mascot on wide screens.
+
+## Next Milestone Goals
+
+Not defined yet — start with `/gsd-new-milestone`. Candidates: push + redeploy v1.1, distributed rate limiting (PLAT-01), persistence/share links for sessions.
+
+<details>
+<summary>v1.1 milestone goal (archived)</summary>
 
 **Goal:** After generating a component, the user refines it with follow-up prompts that edit the current component instead of regenerating from scratch.
 
-**Target features:**
-- Refine-by-default after first generation, with a "Novo componente" reset
-- Model context = current code + instruction only (no prompt history, keeps free-tier token use low)
-- In-memory version history (undo to earlier versions; no persistence)
-- Visible turn list (mini-chat of session prompts)
-- Editable code view; refinement builds on user edits
-- Demo GIF linked from both READMEs
+**Target features:** refine-by-default with "Novo componente" reset; model context = current code + instruction only; in-memory version history; visible turn list; editable code view; demo GIF in both READMEs.
+
+</details>
 
 ## Core Value
 
@@ -30,16 +35,18 @@ A user types a prompt and gets working, previewable React + Tailwind component c
 - ✓ Generated component renders live in a secure sandboxed preview (allow-scripts-only srcdoc iframe, always light, self-hosted runtime) — v1.0
 - ✓ User can copy and download the generated code — v1.0
 - ✓ User can pick from a gallery of example prompts to seed generation — v1.0
-- ✓ UI supports light/dark theme, is responsive, and handles loading/empty/error states accessibly — v1.0
+- ✓ UI supports light/dark theme (dark-only since v1.1 by user decision), is responsive, and handles loading/empty/error states accessibly — v1.0
 - ✓ Covered by unit tests (Vitest, 93) and e2e (Playwright), runs in CI (GitHub Actions), deploys publicly on Vercel — v1.0
+
+- ✓ Iterative refinement: follow-up prompts edit the current component (current code + instruction); "Novo componente" starts over; model-generated suggestion chips — v1.1
+- ✓ In-memory version history (undo, restore any version, 20-version cap) — v1.1
+- ✓ Visible, accessible turn list (mini-chat of session prompts) — v1.1
+- ✓ Editable code view; refinement builds on manual edits — v1.1
+- ✓ Demo GIF (`docs/demo.gif`) linked from both READMEs; refine journey e2e — v1.1
 
 ### Active
 
-- [x] Iterative refinement: after the first generation, a follow-up prompt edits the current component (current code + instruction sent to the model); "Novo componente" starts from scratch — validated in Phase 6 (session reducer, refine-by-default form, undo + Ctrl/Cmd+Z, AlertDialog reset, model-generated suggestion chips via `/api/suggest`)
-- [x] In-memory version history within the session (go back to a previous version) — validated in Phases 6–7 (undo, restore any version, 20-version cap with stable numbering)
-- [x] Visible list of turns (prompts sent in the session, mini-chat style) — validated in Phase 7 (accessible turn list, gerando/erro status, restore, base notice)
-- [x] Editable code: user edits in the code view and refinement uses the edited version — validated in Phase 8 (react-simple-code-editor, 500 ms preview debounce, "Edição manual" versions committed before refine/undo/restore)
-- [x] Demo GIF (`docs/demo.gif`) linked from both READMEs — validated in Phase 9 (recorded from the mock with `npm run demo:gif`, 2.85 MB; journey e2e added; READMEs PT/EN updated)
+(None — define with `/gsd-new-milestone`)
 
 ### Out of Scope
 
@@ -50,7 +57,7 @@ A user types a prompt and gets working, previewable React + Tailwind component c
 
 ## Context
 
-**Current state (v1.0 shipped 2026-10-17):** ~2,700 LOC TypeScript/TSX. Next.js 15.5 App Router, React 19, Tailwind v4, shadcn/ui, Vercel AI SDK v7 + @ai-sdk/google (gemini-3.8-flash primary). Live at https://uiforge-orlasup-project.vercel.app. Known issue found after launch and fixed: browser extensions blocking jsDelivr blanked the preview, so the preview runtime is now self-hosted. Each prompt is generated from scratch (no conversation context).
+**Current state (v1.1 completed 2026-10-18, local):** ~11,500 LOC TypeScript/TSX in `src/` + `e2e/`, 419 unit tests. v1.1 added the session reducer, `/api/suggest`, react-simple-code-editor, a three.js topology background and a Spline robot mascot (loaded on demand, >=1536px, motion allowed). The live deploy still runs v1.0 until the user pushes. Previously (v1.0 shipped 2026-10-17): ~2,700 LOC. Next.js 15.5 App Router, React 19, Tailwind v4, shadcn/ui, Vercel AI SDK v7 + @ai-sdk/google (gemini-3.8-flash primary). Live at https://uiforge-orlasup-project.vercel.app. Known issue found after launch and fixed: browser extensions blocking jsDelivr blanked the preview, so the preview runtime is now self-hosted. Since v1.1, refinements send only the current code + instruction (no prompt history).
 
 - Target user: the project owner, a front-end developer building a portfolio to attract recruiters at large companies.
 - AI must use a free tier: Google Gemini via Vercel AI SDK (Groq is a documented fallback).
@@ -80,6 +87,11 @@ A user types a prompt and gets working, previewable React + Tailwind component c
 | No authentication in v1 | Keeps portfolio demo frictionless | ✓ Good |
 | Self-host preview runtime (React/Babel/Tailwind) in public/ | jsDelivr blocked by ad/privacy extensions left preview blank for real users | ✓ Shipped 2026-10-17 with 15s load watchdog |
 | Gemini model fallback chain (3.8-flash → 3.6-flash → 3.5-flash-lite) | Free-tier 503 "high demand" / per-model 429 | ✓ Good |
+| Refine = stateless `currentCode` + instruction, full file back (no diffs, no history) | Keeps free-tier tokens low and output always a complete component | ✓ Good — v1.1 |
+| Pure session reducer with 20-version cap and stable numbering (`droppedCount`) | Testable undo/restore/abort logic independent of React | ✓ Good — v1.1 |
+| react-simple-code-editor + Prism instead of Monaco/CodeMirror | Tiny bundle, enough for one-file editing | ✓ Good — v1.1 (mobile/screen-reader manual checks pending) |
+| Dark-only UI with decorative 3D (Spline robot, three.js background) | User preference; 3D gated to wide screens + motion allowed, loaded on demand | — Pending (watch bundle/perf on deploy) |
+| Double-buffered preview iframe | Edits no longer flash a blank preview | ✓ Good — v1.1 |
 
 ## Evolution
 
@@ -99,4 +111,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-18 — Milestone v1.1 complete (Phases 5–9); site is dark-only by user decision; not yet pushed/deployed*
+*Last updated: 2026-10-18 after v1.1 milestone (archived; not yet pushed/deployed)*
