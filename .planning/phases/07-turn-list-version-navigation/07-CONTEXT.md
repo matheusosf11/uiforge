@@ -57,7 +57,7 @@ Out of this phase: editable code and "Edição manual" versions (Phase 8; the li
 - **D-16:** On restore, the suggestion chips switch to the restored version's chips. They come from the cache when present and are fetched otherwise.
 
 ### Numbering & cap
-- **D-17:** Version numbers are stable and come from the version id: v7 stays v7 forever. After the cap drops old versions, the list starts at a later number and shows a line "Versões mais antigas descartadas". The session bar changes from "vN de M" to "vN · M versões". Status and announcements use the stable number.
+- **D-17:** Version numbers are stable display numbers: v7 stays v7 forever, including after the cap drops older versions. They are NOT the raw internal `version.id`, which keeps counting across resets and regenerations. Use a `droppedCount` in the session state plus the index (`droppedCount + index + 1`), so a new session starts at v1 again. After a refine from an older version discards the later ones, the new version takes the next number. After the cap drops old versions, the list starts at a later number and shows a line "Versões mais antigas descartadas (limite de 20)", shown when `droppedCount > 0`. The session bar changes from "vN de M" to "vN · M versões". Status and announcements use the stable number.
 
 ### Accessibility & keyboard
 - **D-18:** The list is a semantic `<ol>` with an accessible name, for example "Histórico de versões". Each version is a regular `<button>` inside an `<li>`. Tab and Shift+Tab move between items; Enter or Space restores. No roving tabindex.
