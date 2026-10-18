@@ -64,8 +64,13 @@ export function useGeneratorSession(opts?: { fetchImpl?: typeof fetch }) {
         if (result.ok) {
           const code = parseCode(result.text);
           const valid = code.trim() !== "" && hasDefaultExport(code);
+          // Defense in depth: mirrors the reducer's IN-01 guard (a removed
+          // base rejects the commit), so the shell keeps the prompt.
+          const baseStillKept =
+            base === null ||
+            stateRef.current.versions.some((v) => v.id === base.id);
           dispatch({ type: "COMMIT", id, raw: result.text });
-          return valid ? "committed" : "failed";
+          return valid && baseStillKept ? "committed" : "failed";
         }
         if (result.reason === "aborted") return "aborted";
         if (result.reason === "http") {
@@ -138,6 +143,12 @@ export function useGeneratorSession(opts?: { fetchImpl?: typeof fetch }) {
 
   const undo = useCallback(() => dispatch({ type: "UNDO" }), []);
 
+  // The reducer ignores RESTORE while pending, so no busy check here.
+  const restore = useCallback(
+    (versionId: number) => dispatch({ type: "RESTORE", versionId }),
+    [],
+  );
+
   const reset = useCallback(() => {
     if (inFlightRef.current !== null || isBusy(stateRef.current)) return;
     dispatch({ type: "RESET" });
@@ -161,6 +172,7 @@ export function useGeneratorSession(opts?: { fetchImpl?: typeof fetch }) {
     regenerate,
     stop,
     undo,
+    restore,
     reset,
   };
 }
