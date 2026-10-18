@@ -4,6 +4,7 @@ import { useCallback, useEffect, useReducer, useRef } from "react";
 
 import { hasDefaultExport } from "@/lib/has-default-export";
 import { parseCode } from "@/lib/parse-code";
+import type { PromptImage } from "@/lib/prompt-image";
 import { MAX_CODE_LENGTH } from "@/lib/prompt-limits";
 import {
   canRegenerate as selectCanRegenerate,
@@ -31,8 +32,13 @@ export function useGeneratorSession(opts?: { fetchImpl?: typeof fetch }) {
   fetchImplRef.current = opts?.fetchImpl;
 
   // `base` null = fresh generation ({ prompt } only, no currentCode).
+  // `image` is an optional visual reference sent along with this request.
   const run = useCallback(
-    async (text: string, base: Version | null): Promise<SendResult> => {
+    async (
+      text: string,
+      base: Version | null,
+      image?: PromptImage | null,
+    ): Promise<SendResult> => {
       const instruction = text.trim();
       if (!instruction) return "ignored";
       if (inFlightRef.current !== null || isBusy(stateRef.current)) {
@@ -52,7 +58,11 @@ export function useGeneratorSession(opts?: { fetchImpl?: typeof fetch }) {
 
       try {
         const result = await streamGenerate(
-          { prompt: instruction, ...(base ? { currentCode: base.code } : {}) },
+          {
+            prompt: instruction,
+            ...(base ? { currentCode: base.code } : {}),
+            ...(image ? { image } : {}),
+          },
           {
             signal: ac.signal,
             fetchImpl: fetchImplRef.current,
@@ -119,7 +129,11 @@ export function useGeneratorSession(opts?: { fetchImpl?: typeof fetch }) {
   // EDIT-06: refine from the edited code. Ignored sends never commit a draft;
   // an oversized draft is committed, then run() rejects it as too_large.
   const send = useCallback(
-    (text: string, draft?: string | null): Promise<SendResult> => {
+    (
+      text: string,
+      draft?: string | null,
+      image?: PromptImage | null,
+    ): Promise<SendResult> => {
       if (
         !text.trim() ||
         inFlightRef.current !== null ||
@@ -128,7 +142,7 @@ export function useGeneratorSession(opts?: { fetchImpl?: typeof fetch }) {
         return Promise.resolve("ignored");
       }
       commitManual(draft);
-      return run(text, committedVersion(stateRef.current));
+      return run(text, committedVersion(stateRef.current), image);
     },
     [run, commitManual],
   );
@@ -137,18 +151,21 @@ export function useGeneratorSession(opts?: { fetchImpl?: typeof fetch }) {
   // (null base = first generation, retried without currentCode). With a
   // draft, the edit is committed and becomes the base so it is never lost.
   const retry = useCallback(
-    async (draft?: string | null): Promise<SendResult> => {
+    async (
+      draft?: string | null,
+      image?: PromptImage | null,
+    ): Promise<SendResult> => {
       const s = stateRef.current;
       const error = s.error;
       if (!error || error.kind === "too_large") return "ignored";
       const manual = commitManual(draft);
-      if (manual) return run(error.instruction, manual);
+      if (manual) return run(error.instruction, manual, image);
       const base =
         error.baseId === null
           ? null
           : (s.versions.find((v) => v.id === error.baseId) ??
             committedVersion(s));
-      return run(error.instruction, base);
+      return run(error.instruction, base, image);
     },
     [run, commitManual],
   );

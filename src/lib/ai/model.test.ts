@@ -1,6 +1,11 @@
 /// <reference types="vitest/globals" />
 import { MODEL_IDS, getModels, isE2EMock } from "./model";
-import { FIXED_COMPONENT, REFINED_COMPONENT, createE2EMockModel } from "./mock-model";
+import {
+  FIXED_COMPONENT,
+  IMAGE_COMPONENT,
+  REFINED_COMPONENT,
+  createE2EMockModel,
+} from "./mock-model";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -47,9 +52,9 @@ describe("getModels", () => {
   });
 });
 
-async function consume(prompt: string, currentCode?: string) {
+async function consume(prompt: string, currentCode?: string, messages: unknown[] = []) {
   const model = createE2EMockModel(prompt, currentCode);
-  const { stream } = await model.doStream({ prompt: [] } as never);
+  const { stream } = await model.doStream({ prompt: messages } as never);
   const parts: Array<{ type: string; delta?: string }> = [];
   const reader = stream.getReader();
   for (;;) {
@@ -122,6 +127,24 @@ describe("mock model refine mode", () => {
     const types = parts.map((p) => p.type);
     expect(types.at(-1)).toBe("error");
     expect(types).not.toContain("finish");
+  });
+
+  it("streams IMAGE_COMPONENT when the request carries an image", async () => {
+    const messages = [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "p" },
+          { type: "file", mediaType: "image/png", data: { type: "data", data: "AA" } },
+        ],
+      },
+    ];
+    const text = (await consume("p", undefined, messages))
+      .filter((p) => p.type === "text-delta")
+      .map((p) => p.delta)
+      .join("");
+    expect(text).toBe(IMAGE_COMPONENT);
+    expect(text).toContain('src="uiforge:image"');
   });
 
   it("generate output is unchanged without currentCode", async () => {

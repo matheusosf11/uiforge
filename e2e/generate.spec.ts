@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { fillPromptWhenReady } from "./helpers";
 
 const IFRAME = 'iframe[title="Live preview"]';
 
@@ -7,7 +8,7 @@ const isGenerate = (r: import("@playwright/test").Request) =>
 
 async function generate(page: Page, prompt = "a simple card") {
   await page.goto("/");
-  await page.getByRole("textbox", { name: "Prompt" }).fill(prompt);
+  await fillPromptWhenReady(page, prompt);
   await page.getByRole("button", { name: "Gerar" }).click();
 }
 
@@ -19,7 +20,9 @@ test("happy path: prompt streams code and preview mounts FixtureCard", async ({
   const iframe = page.locator(IFRAME);
   await expect(iframe).toBeVisible();
   // Offline-safe assertion on the generated document.
-  await expect(iframe).toHaveAttribute("srcdoc", /FixtureCard/);
+  await expect(iframe).toHaveAttribute("srcdoc", /FixtureCard/, {
+    timeout: 15000,
+  });
   // Depends on the CDN-hosted runtime inside the iframe, hence the long timeout.
   await expect(
     page.frameLocator(IFRAME).getByText("FixtureCard").first(),
@@ -109,15 +112,21 @@ test.describe("refine smoke", () => {
     await page.getByRole("button", { name: "Refinar", exact: true }).click();
     expect((await refineRes).ok()).toBe(true);
     await expect(page.getByText("Pronto — v2")).toBeVisible({ timeout: 15000 });
-    await expect(page.locator(IFRAME)).toHaveAttribute("srcdoc", /Refinado/);
+    await expect(page.locator(IFRAME)).toHaveAttribute("srcdoc", /Refinado/, {
+      timeout: 15000,
+    });
     await expect(field).toHaveValue("");
     await expect(page.getByText("v2 · 2 versões")).toBeVisible();
 
     await page.getByRole("button", { name: "Desfazer" }).click();
     await expect(page.getByText("Voltou para v1")).toBeVisible();
     const iframe = page.locator(IFRAME);
-    await expect(iframe).toHaveAttribute("srcdoc", /FixtureCard/);
-    await expect(iframe).not.toHaveAttribute("srcdoc", /Refinado/);
+    await expect(iframe).toHaveAttribute("srcdoc", /FixtureCard/, {
+      timeout: 15000,
+    });
+    await expect(iframe).not.toHaveAttribute("srcdoc", /Refinado/, {
+      timeout: 15000,
+    });
   });
 
   test("refine failure keeps v1 and shows the alert", async ({ page }) => {
@@ -131,7 +140,9 @@ test.describe("refine smoke", () => {
     const alert = page.getByRole("alert").first();
     await expect(alert).toBeVisible({ timeout: 15000 });
     await expect(alert).toContainText("Sua versão anterior foi mantida");
-    await expect(page.locator(IFRAME)).toHaveAttribute("srcdoc", /FixtureCard/);
+    await expect(page.locator(IFRAME)).toHaveAttribute("srcdoc", /FixtureCard/, {
+      timeout: 15000,
+    });
     await expect(page.getByText("v1 · 1 versão")).toBeVisible();
     await expect(field).toHaveValue("__e2e_error__ refine");
   });
@@ -154,8 +165,12 @@ test.describe("refine smoke", () => {
     await page.getByRole("button", { name: /^Restaurar v1:/ }).click();
     await expect(page.getByText("Voltou para v1")).toBeVisible();
     const iframe = page.locator(IFRAME);
-    await expect(iframe).toHaveAttribute("srcdoc", /FixtureCard/);
-    await expect(iframe).not.toHaveAttribute("srcdoc", /Refinado/);
+    await expect(iframe).toHaveAttribute("srcdoc", /FixtureCard/, {
+      timeout: 15000,
+    });
+    await expect(iframe).not.toHaveAttribute("srcdoc", /Refinado/, {
+      timeout: 15000,
+    });
     await expect(
       page.getByText("Refinar a partir da v1 — v2 será descartada"),
     ).toBeVisible();
@@ -168,7 +183,9 @@ test.describe("refine smoke", () => {
       .getByRole("button", { name: /^Restaurar v2:.*Será descartada ao refinar\.$/ })
       .click();
     await expect(page.getByText("Foi para v2")).toBeVisible();
-    await expect(iframe).toHaveAttribute("srcdoc", /Refinado/);
+    await expect(iframe).toHaveAttribute("srcdoc", /Refinado/, {
+      timeout: 15000,
+    });
   });
 });
 

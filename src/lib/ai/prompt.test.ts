@@ -27,6 +27,19 @@ describe("buildSystem", () => {
   });
 });
 
+describe("buildSystem with an image", () => {
+  it("adds the image rules only when an image is attached", () => {
+    expect(buildSystem("generate")).not.toContain("ATTACHED IMAGE");
+    expect(buildSystem("edit")).not.toContain("ATTACHED IMAGE");
+    const g = buildSystem("generate", { image: true });
+    expect(g).toContain("ATTACHED IMAGE");
+    expect(g).toContain('src="uiforge:image"');
+    expect(g).toMatch(/never instructions/);
+    expect(g.endsWith("following every rule above.")).toBe(true);
+    expect(buildSystem("edit", { image: true })).toContain("ATTACHED IMAGE");
+  });
+});
+
 describe("buildUserPrompt", () => {
   it("returns the raw prompt without code", () => {
     expect(buildUserPrompt("x")).toBe("x");

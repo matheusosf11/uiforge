@@ -1,7 +1,7 @@
 /// <reference types="vitest/globals" />
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PromptForm } from "@/components/generator/prompt-form";
 
@@ -325,6 +325,79 @@ describe("PromptForm", () => {
         />,
       );
       expect(ref.current).toBe(screen.getByRole("textbox", { name: "Prompt" }));
+    });
+  });
+
+  describe("reference image", () => {
+    const base = {
+      value: "x",
+      onChange: () => {},
+      onSubmit: () => {},
+      onStop: () => {},
+      isLoading: false,
+    };
+    const png = () => new File(["x"], "print.png", { type: "image/png" });
+
+    it("hides the image controls when attaching is not wired", () => {
+      render(<PromptForm {...base} />);
+      expect(screen.queryByRole("button", { name: "Imagem" })).toBeNull();
+    });
+
+    it("attaches a picked file and lets it be removed", async () => {
+      const user = userEvent.setup();
+      const onAttachImage = vi.fn();
+      const onRemoveImage = vi.fn();
+      const { rerender } = render(
+        <PromptForm {...base} onAttachImage={onAttachImage} />,
+      );
+      const file = png();
+      await user.upload(screen.getByLabelText("Anexar imagem de referência"), file);
+      expect(onAttachImage).toHaveBeenCalledWith(file);
+
+      rerender(
+        <PromptForm
+          {...base}
+          onAttachImage={onAttachImage}
+          onRemoveImage={onRemoveImage}
+          image={{ name: "print.png", src: "data:image/jpeg;base64,AA" }}
+        />,
+      );
+      expect(
+        screen.getByRole("img", { name: "Imagem de referência anexada" }),
+      ).toBeTruthy();
+      expect(screen.getByText("print.png")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Trocar imagem" })).toBeTruthy();
+      await user.click(screen.getByRole("button", { name: "Remover imagem" }));
+      expect(onRemoveImage).toHaveBeenCalled();
+    });
+
+    it("attaches a pasted or dropped image", () => {
+      const onAttachImage = vi.fn();
+      render(<PromptForm {...base} onAttachImage={onAttachImage} />);
+      const field = screen.getByRole("textbox", { name: "Prompt" });
+      const pasted = png();
+      fireEvent.paste(field, { clipboardData: { files: [pasted] } });
+      expect(onAttachImage).toHaveBeenLastCalledWith(pasted);
+      const dropped = png();
+      fireEvent.drop(field, { dataTransfer: { files: [dropped], types: ["Files"] } });
+      expect(onAttachImage).toHaveBeenLastCalledWith(dropped);
+    });
+
+    it("shows the refusal message and disables attaching while loading", () => {
+      render(
+        <PromptForm
+          {...base}
+          isLoading
+          onAttachImage={vi.fn()}
+          imageError="Use uma imagem PNG, JPG ou WebP."
+        />,
+      );
+      expect(screen.getByRole("alert").textContent).toBe(
+        "Use uma imagem PNG, JPG ou WebP.",
+      );
+      expect(
+        (screen.getByRole("button", { name: "Imagem" }) as HTMLButtonElement).disabled,
+      ).toBe(true);
     });
   });
 });

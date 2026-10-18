@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getModels, isE2EMock } from "@/lib/ai/model";
 import { buildSystem, buildUserPrompt, type Mode } from "@/lib/ai/prompt";
 import { isRateLimitError } from "@/lib/generate-error";
+import { IMAGE_MEDIA_TYPES, MAX_IMAGE_BASE64_LENGTH } from "@/lib/prompt-image";
 import { MAX_CODE_LENGTH, MAX_PROMPT_LENGTH } from "@/lib/prompt-limits";
 import { checkRateLimit, clientIp, getRateLimitConfig } from "@/lib/rate-limit";
 
@@ -16,7 +17,9 @@ const MAX_OUTPUT_TOKENS = 32_768;
 // (control chars become \u00XX; non-BMP chars are 4 UTF-8 bytes per 2 units).
 // (30_000 code + 2_000 prompt) * 6 = 192_000, plus envelope/keys, is ~193 KB.
 // 256_000 leaves margin so a legitimate max-size body never trips the guard.
-const MAX_BODY_BYTES = 256_000;
+// An attached image adds its base64 (plain ASCII, 1 byte per char) on top.
+const MAX_BODY_BYTES = 256_000 + MAX_IMAGE_BASE64_LENGTH;
+const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
 
 // Whitespace-only/null/absent currentCode means generate mode (D-08); real
 // code keeps its original untrimmed text. No .max here: oversize is a 413.
@@ -29,6 +32,14 @@ const Body = z.object({
     .string()
     .nullish()
     .transform((c) => (c && c.trim() !== "" ? c : undefined)),
+  // Optional visual reference, already shrunk by the browser.
+  image: z
+    .object({
+      mediaType: z.enum(IMAGE_MEDIA_TYPES),
+      data: z.string().min(1).max(MAX_IMAGE_BASE64_LENGTH).regex(BASE64),
+    })
+    .nullish()
+    .transform((i) => i ?? undefined),
 });
 
 export async function POST(req: Request) {
@@ -55,11 +66,11 @@ export async function POST(req: Request) {
     parsed = result.data;
   } catch {
     return new Response(
-      `Invalid request: prompt must be a non-empty string of at most ${MAX_PROMPT_LENGTH} characters.`,
+      `Invalid request: prompt must be a non-empty string of at most ${MAX_PROMPT_LENGTH} characters; image must be PNG, JPEG or WebP base64.`,
       { status: 400 },
     );
   }
-  const { prompt, currentCode } = parsed;
+  const { prompt, currentCode, image } = parsed;
   // Before the limiter so oversize requests consume no quota (D-05, D-06, D-09).
   if (currentCode && currentCode.length > MAX_CODE_LENGTH) {
     return new Response("code_too_large", { status: 413 });
@@ -87,7 +98,14 @@ export async function POST(req: Request) {
   let lastFailure: Response = new Response("generate_failed", { status: 502 });
   for (const model of await getModels(prompt, currentCode)) {
     if (req.signal.aborted) break;
-    const attempt = await openStream(model, mode, prompt, currentCode, req.signal);
+    const attempt = await openStream(
+      model,
+      mode,
+      prompt,
+      currentCode,
+      image,
+      req.signal,
+    );
     if ("failure" in attempt) {
       lastFailure = attempt.failure;
       continue;
@@ -176,6 +194,7 @@ type FullStreamReader = ReadableStreamDefaultReader<
     : never
 >;
 type Opened = { reader: FullStreamReader; firstDelta: string; modelId: string };
+type Image = NonNullable<z.infer<typeof Body>["image"]>;
 
 // Peek one model's full stream until the first text delta so a provider
 // failure (e.g. 429/503) can be reported as a real HTTP status — or trigger
@@ -185,12 +204,30 @@ async function openStream(
   mode: Mode,
   prompt: string,
   currentCode: string | undefined,
+  image: Image | undefined,
   abortSignal: AbortSignal,
 ): Promise<Opened | { failure: Response }> {
+  const text = buildUserPrompt(prompt, currentCode);
   const result = streamText({
     model,
-    system: buildSystem(mode),
-    prompt: buildUserPrompt(prompt, currentCode),
+    system: buildSystem(mode, { image: !!image }),
+    ...(image
+      ? {
+          messages: [
+            {
+              role: "user" as const,
+              content: [
+                { type: "text" as const, text },
+                {
+                  type: "file" as const,
+                  mediaType: image.mediaType,
+                  data: { type: "data" as const, data: image.data },
+                },
+              ],
+            },
+          ],
+        }
+      : { prompt: text }),
     maxOutputTokens: MAX_OUTPUT_TOKENS,
     // Client disconnect/"Parar" cancels the provider request (and quota use).
     abortSignal,

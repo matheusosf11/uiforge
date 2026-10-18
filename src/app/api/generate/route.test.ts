@@ -424,4 +424,87 @@ describe("POST /api/generate", () => {
       expect(call().system).not.toContain("import fetch");
     });
   });
+
+  describe("imagem de referencia", () => {
+    const PNG = "iVBORw0KGgo=";
+    const call = () =>
+      vi.mocked(streamText).mock.lastCall?.[0] as unknown as {
+        system: string;
+        prompt?: string;
+        messages?: { role: string; content: Record<string, unknown>[] }[];
+      };
+
+    it("envia texto + imagem como mensagem e adiciona as regras de imagem", async () => {
+      state.parts = [{ type: "text-delta", text: "a" }];
+      const res = await POST(
+        req({ prompt: "igual ao print", image: { mediaType: "image/png", data: PNG } }),
+      );
+      expect(res.status).toBe(200);
+      await res.text();
+      expect(call().prompt).toBeUndefined();
+      expect(call().system).toBe(buildSystem("generate", { image: true }));
+      expect(call().system).toContain("ATTACHED IMAGE");
+      expect(call().messages).toEqual([
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "igual ao print" },
+            {
+              type: "file",
+              mediaType: "image/png",
+              data: { type: "data", data: PNG },
+            },
+          ],
+        },
+      ]);
+    });
+
+    it("refine com imagem: codigo + instrucao no texto, modo edit", async () => {
+      state.parts = [{ type: "text-delta", text: "a" }];
+      const res = await POST(
+        req({
+          prompt: "x",
+          currentCode: "code",
+          image: { mediaType: "image/jpeg", data: PNG },
+        }),
+      );
+      await res.text();
+      expect(call().system).toBe(buildSystem("edit", { image: true }));
+      expect(call().messages?.[0].content[0].text).toContain("<current_code>");
+    });
+
+    it("sem imagem (null) segue o caminho de prompt de texto", async () => {
+      state.parts = [{ type: "text-delta", text: "a" }];
+      const res = await POST(req({ prompt: "x", image: null }));
+      await res.text();
+      expect(call().prompt).toBe("x");
+      expect(call().messages).toBeUndefined();
+    });
+
+    it.each([
+      [{ mediaType: "image/gif", data: PNG }],
+      [{ mediaType: "image/svg+xml", data: PNG }],
+      [{ mediaType: "image/png", data: "not base64!" }],
+      [{ mediaType: "image/png", data: "" }],
+      [{ mediaType: "image/png", data: "A".repeat(1_500_001) }],
+      ["data:image/png;base64,AAAA"],
+    ])("imagem invalida %# vira 400 sem chamar o modelo", async (image) => {
+      const res = await POST(req({ prompt: "x", image }));
+      expect(res.status).toBe(400);
+      expect(vi.mocked(streamText)).not.toHaveBeenCalled();
+    });
+
+    it("imagem no limite maximo cabe no corpo", async () => {
+      state.parts = [{ type: "text-delta", text: "a" }];
+      const res = await POST(
+        req({
+          prompt: "x".repeat(2000),
+          currentCode: "a".repeat(30_000),
+          image: { mediaType: "image/webp", data: "A".repeat(1_500_000) },
+        }),
+      );
+      expect(res.status).toBe(200);
+      await res.text();
+    });
+  });
 });

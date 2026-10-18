@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { fillPromptWhenReady } from "./helpers";
 
 // Same conventions as generate.spec.ts (D-02), redefined locally on purpose.
 const IFRAME = 'iframe[title="Live preview"]';
@@ -11,7 +12,7 @@ const isGenerate = (r: import("@playwright/test").Request) =>
 
 async function generate(page: Page, prompt = "a simple card") {
   await page.goto("/");
-  await page.getByRole("textbox", { name: "Prompt" }).fill(prompt);
+  await fillPromptWhenReady(page, prompt);
   await page.getByRole("button", { name: "Gerar" }).click();
 }
 
@@ -50,8 +51,12 @@ test("journey: generate, refine, undo, edit, refine after edit, failed refine ke
   // (3) Undo back to v1; v2 survives as a later version.
   await page.getByRole("button", { name: "Desfazer" }).click();
   await expect(status).toContainText("Voltou para v1");
-  await expect(iframe).toHaveAttribute("srcdoc", /FixtureCard/);
-  await expect(iframe).not.toHaveAttribute("srcdoc", /Refinado/);
+  await expect(iframe).toHaveAttribute("srcdoc", /FixtureCard/, {
+    timeout: 15000,
+  });
+  await expect(iframe).not.toHaveAttribute("srcdoc", /Refinado/, {
+    timeout: 15000,
+  });
   await expect(
     page.getByText("Refinar a partir da v1 — v2 será descartada"),
   ).toBeVisible();
@@ -76,7 +81,9 @@ test("journey: generate, refine, undo, edit, refine after edit, failed refine ke
   expect(editBody.currentCode).toContain("marca-journey");
   await expect(status).toContainText("Pronto — v3", { timeout: 15000 });
   await expect(iframe).toHaveAttribute("srcdoc", /Refinado/, { timeout: 15000 });
-  await expect(iframe).toHaveAttribute("srcdoc", /EditedSeen/);
+  await expect(iframe).toHaveAttribute("srcdoc", /EditedSeen/, {
+    timeout: 15000,
+  });
   await expect(
     page.getByRole("list", { name: "Histórico de versões" }),
   ).toContainText("Edição manual");

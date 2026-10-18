@@ -49,6 +49,19 @@ describe("streamGenerate", () => {
     expect(JSON.parse(init2.body)).toEqual({ prompt: "p", currentCode: "c" });
   });
 
+  it("sends only the image type and data, never the file name", async () => {
+    const fetchImpl = fetchOf(new Response(streamOf(["x"])));
+    await streamGenerate(
+      { prompt: "p", image: { mediaType: "image/jpeg", data: "AAAA", name: "eu.jpg" } },
+      { signal: new AbortController().signal, onText: () => {}, fetchImpl },
+    );
+    const init = (fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    expect(JSON.parse(init.body)).toEqual({
+      prompt: "p",
+      image: { mediaType: "image/jpeg", data: "AAAA" },
+    });
+  });
+
   it("mid-stream error never yields ok true", async () => {
     const fetchImpl = fetchOf(new Response(streamOf(["ab"], true), { status: 200 }));
     const r = await streamGenerate(

@@ -1,3 +1,5 @@
+import type { PromptImage } from "@/lib/prompt-image";
+
 export type StreamResult =
   | { ok: true; text: string }
   | { ok: false; reason: "aborted" }
@@ -13,7 +15,7 @@ function isAbortError(err: unknown): boolean {
 }
 
 export async function streamGenerate(
-  body: { prompt: string; currentCode?: string },
+  body: { prompt: string; currentCode?: string; image?: PromptImage },
   opts: {
     signal: AbortSignal;
     onText: (fullText: string) => void;
@@ -21,10 +23,18 @@ export async function streamGenerate(
   },
 ): Promise<StreamResult> {
   const doFetch = opts.fetchImpl ?? fetch;
-  const payload: { prompt: string; currentCode?: string } = {
+  const payload: {
+    prompt: string;
+    currentCode?: string;
+    image?: { mediaType: string; data: string };
+  } = {
     prompt: body.prompt,
   };
   if (body.currentCode !== undefined) payload.currentCode = body.currentCode;
+  // The file name stays in the browser.
+  if (body.image) {
+    payload.image = { mediaType: body.image.mediaType, data: body.image.data };
+  }
 
   try {
     const res = await doFetch("/api/generate", {

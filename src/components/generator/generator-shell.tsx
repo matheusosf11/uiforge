@@ -25,6 +25,13 @@ import {
 } from "@/lib/generate-error";
 import { parseCode } from "@/lib/parse-code";
 import {
+  imageDataUrl,
+  prepareImage,
+  PromptImageError,
+  withPreviewImage,
+  type PromptImage,
+} from "@/lib/prompt-image";
+import {
   currentNumber,
   laterRange,
   MAX_VERSIONS,
@@ -78,6 +85,13 @@ export function GeneratorShell() {
     code: null,
   });
   const [prompt, setPrompt] = useState("");
+  // Reference image attached to the next send; cleared when it commits.
+  const [image, setImage] = useState<PromptImage | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [imageBusy, setImageBusy] = useState(false);
+  // Last image sent in this session: the preview shows it wherever the code
+  // uses the image token. "Novo componente" forgets it.
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   // D-02: mobile history disclosure; only "Novo componente" collapses it.
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -140,10 +154,12 @@ export function GeneratorShell() {
   // D-11: the preview follows the draft 500 ms after the last keystroke;
   // null (discard, commit, restore, reset) passes through immediately.
   const debounced = useDebouncedDraft(dirty ? draft : null, 500);
-  const previewCode =
+  const previewCode = withPreviewImage(
     dirty && debounced && committed && debounced.baseId === committed.id
       ? debounced.code
-      : (committed?.code ?? "");
+      : (committed?.code ?? ""),
+    previewImage,
+  );
 
   function handleEditorChange(next: string) {
     if (!committed || busy) return;
@@ -223,17 +239,58 @@ export function GeneratorShell() {
         error.baseId !== null ? REFINE_ERROR_MESSAGE : GENERIC_ERROR_MESSAGE;
   }
 
+  async function handleAttachImage(file: File) {
+    setImageError(null);
+    setImageBusy(true);
+    try {
+      setImage(await prepareImage(file));
+    } catch (err) {
+      setImageError(
+        err instanceof PromptImageError
+          ? err.message
+          : "Não foi possível usar essa imagem.",
+      );
+    } finally {
+      setImageBusy(false);
+    }
+  }
+
+  function removeImage() {
+    setImage(null);
+    setImageError(null);
+  }
+
+  // Sends with the attached image. The preview switches to it as soon as the
+  // request starts (the new code streams in), and goes back to the previous
+  // one when nothing was committed.
+  async function sendWithImage(
+    request: (img: PromptImage | null) => Promise<string>,
+  ) {
+    const sent = image;
+    const before = previewImage;
+    if (sent) setPreviewImage(imageDataUrl(sent));
+    const outcome = await request(sent);
+    if (outcome === "committed") {
+      if (sent) setImage((i) => (i === sent ? null : i));
+    } else if (sent) {
+      setPreviewImage(before);
+    }
+    return outcome;
+  }
+
   async function handleSubmit() {
     // D-07/D-10: the draft (broken or oversized, as-is) is committed as a
     // manual version only when the refine actually starts.
-    const outcome = await session.send(prompt.trim(), draftCode);
+    const outcome = await sendWithImage((img) =>
+      session.send(prompt.trim(), draftCode, img),
+    );
     // D-02: clear only when a version was committed.
     if (outcome === "committed") setPrompt("");
   }
 
   async function handleRetry() {
     const instruction = error?.instruction ?? "";
-    const outcome = await session.retry(draftCode);
+    const outcome = await sendWithImage((img) => session.retry(draftCode, img));
     // D-02: a committed retry clears the field like a submit, unless the user
     // already edited it into a different draft meanwhile.
     if (outcome === "committed") {
@@ -282,7 +339,8 @@ export function GeneratorShell() {
     setDraft(null);
     suggestions.reset();
     setHistoryOpen(false);
-    // D-13: prompt text is intentionally preserved.
+    setPreviewImage(null);
+    // D-13: prompt text (and an attached image) is intentionally preserved.
   }
 
   function requestNew() {
@@ -330,6 +388,11 @@ export function GeneratorShell() {
       mode={refineMode ? "refine" : "generate"}
       chips={refineMode ? chips : null}
       textareaRef={textareaRef}
+      image={image ? { name: image.name, src: imageDataUrl(image) } : null}
+      onAttachImage={(file) => void handleAttachImage(file)}
+      onRemoveImage={removeImage}
+      imageError={imageError}
+      imageBusy={imageBusy}
       baseNotice={refineMode ? baseNotice : null}
       turnList={
         refineMode ? (

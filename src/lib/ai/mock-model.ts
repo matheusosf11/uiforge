@@ -3,9 +3,9 @@ import { MockLanguageModelV4 } from "ai/test";
 
 // Derived from declared packages only (avoids importing undeclared @ai-sdk/provider).
 type LanguageModelV4StreamPart =
-  Awaited<ReturnType<MockLanguageModelV4["doStream"]>>["stream"] extends ReadableStream<
-    infer P
-  >
+  Awaited<
+    ReturnType<MockLanguageModelV4["doStream"]>
+  >["stream"] extends ReadableStream<infer P>
     ? P
     : never;
 
@@ -58,54 +58,85 @@ function chunkText(text: string): string[] {
   return out;
 }
 
-export function createE2EMockModel(prompt: string, currentCode?: string) {
-  const text = currentCode
-    ? REFINED_COMPONENT.replace(
-        EDITED_SLOT,
-        currentCode.includes("__edited__")
-          ? '<p className="text-sm">EditedSeen</p>'
-          : EDITED_SLOT,
-      )
-    : FIXED_COMPONENT;
-  const deltas = chunkText(text).map((delta) => ({
-    type: "text-delta" as const,
-    id: ID,
-    delta,
-  }));
-  const shouldFail = prompt.includes(ERROR_KEYWORD);
+// Streamed instead of FIXED_COMPONENT when the request carries an image.
+export const IMAGE_COMPONENT = `import React from "react";
 
-  const chunks: LanguageModelV4StreamPart[] = shouldFail
-    ? [
-        { type: "text-start" as const, id: ID },
-        ...deltas.slice(0, 4),
-        {
-          type: "error" as const,
-          error: new Error("e2e mock mid-stream failure"),
-        },
-      ]
-    : [
-        { type: "text-start" as const, id: ID },
-        ...deltas,
-        { type: "text-end" as const, id: ID },
-        {
-          type: "finish" as const,
-          finishReason: { unified: "stop" as const, raw: "stop" },
-          usage: {
-            inputTokens: {
-              total: 10,
-              noCache: 10,
-              cacheRead: undefined,
-              cacheWrite: undefined,
-            },
-            outputTokens: { total: 50, text: 50, reasoning: undefined },
+export default function FixtureImageCard() {
+  return (
+    <div className="mx-auto max-w-sm rounded-xl border border-slate-200 bg-white p-6 shadow-md">
+      <img src="uiforge:image" alt="Imagem enviada" className="h-40 w-full rounded-lg object-cover" />
+      <h2 className="mt-4 text-xl font-semibold text-slate-900">ImageSeen</h2>
+    </div>
+  );
+}
+`;
+
+type StreamOptions = Parameters<MockLanguageModelV4["doStream"]>[0];
+
+function hasImage(options: StreamOptions): boolean {
+  return options.prompt.some(
+    (m) =>
+      m.role === "user" &&
+      m.content.some(
+        (part) => part.type === "file" && part.mediaType.startsWith("image"),
+      ),
+  );
+}
+
+export function createE2EMockModel(prompt: string, currentCode?: string) {
+  const textFor = (image: boolean) =>
+    image && !currentCode ? IMAGE_COMPONENT : buildText();
+  const buildText = () =>
+    currentCode
+      ? REFINED_COMPONENT.replace(
+          EDITED_SLOT,
+          currentCode.includes("__edited__")
+            ? '<p className="text-sm">EditedSeen</p>'
+            : EDITED_SLOT,
+        )
+      : FIXED_COMPONENT;
+  const chunksFor = (text: string): LanguageModelV4StreamPart[] => {
+    const deltas = chunkText(text).map((delta) => ({
+      type: "text-delta" as const,
+      id: ID,
+      delta,
+    }));
+    const shouldFail = prompt.includes(ERROR_KEYWORD);
+
+    const chunks: LanguageModelV4StreamPart[] = shouldFail
+      ? [
+          { type: "text-start" as const, id: ID },
+          ...deltas.slice(0, 4),
+          {
+            type: "error" as const,
+            error: new Error("e2e mock mid-stream failure"),
           },
-        },
-      ];
+        ]
+      : [
+          { type: "text-start" as const, id: ID },
+          ...deltas,
+          { type: "text-end" as const, id: ID },
+          {
+            type: "finish" as const,
+            finishReason: { unified: "stop" as const, raw: "stop" },
+            usage: {
+              inputTokens: {
+                total: 10,
+                noCache: 10,
+                cacheRead: undefined,
+                cacheWrite: undefined,
+              },
+              outputTokens: { total: 50, text: 50, reasoning: undefined },
+            },
+          },
+        ];
+    return chunks;
+  };
 
   return new MockLanguageModelV4({
-    doStream: async () => ({
+    doStream: async (options) => ({
       stream: simulateReadableStream({
-        chunks,
+        chunks: chunksFor(textFor(hasImage(options))),
         initialDelayInMs: 50,
         chunkDelayInMs: 30,
       }),
