@@ -22,7 +22,8 @@
 - [x] **Phase 5: Refine API Contract & Edit Prompt** - Stateless `currentCode` contract, edit-mode prompt returning the full component, mock model extended for refine (completed 2026-10-17)
 - [x] **Phase 6: Session Core & Refine Loop** - Pure session reducer plus shell that refines by default, keeps previous version on failure, undo, reset and shortcuts (completed 2026-10-18)
 - [x] **Phase 7: Turn List & Version Navigation** - Accessible mini-chat list of turns that restores any version and shows the refine base (completed 2026-10-18)
-- [x] **Phase 8: Editable Code View** - Syntax-highlighted editable code that live-updates preview and feeds the next refinement (completed 2026-10-18)
+- [x] **Phase 8: Editable Code View** - Syntax-highlighted editable code that live-updates preview and feeds the next refinement
+ (completed 2026-10-18)
 - [ ] **Phase 9: E2E, Demo GIF & Docs** - Full refine journey covered by e2e, recorded demo GIF, PT/EN READMEs updated
 
 ## Phase Details
@@ -105,7 +106,12 @@ Plans:
   1. E2E passes the journey generate → refine → undo → edit → refine-after-edit → failed refine keeps previous version, using the mock model in refine mode (existing selectors updated for "Refinar")
   2. `docs/demo.gif` (≤ ~3 MB), recorded from the deterministic mock, shows generate → refine → undo → manual edit and is linked from both READMEs with alt text
   3. Both READMEs (PT/EN) document iterative refinement, version history, editable code and the refine API contract
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 09-01-PLAN.md — Refine journey e2e (e2e/journey.spec.ts), isolated Playwright run on port 3200
+- [ ] 09-02-PLAN.md — Demo spec + demo:gif script (ffmpeg palette), docs/demo.gif, dark-only screenshots
+- [ ] 09-03-PLAN.md — README.md / README.pt-BR.md for refine, history, editable code, API contract
 
 ## Progress
 
@@ -119,4 +125,4 @@ Plans:
 | 6. Session Core & Refine Loop | v1.1 | 7/7 | Complete    | 2026-10-18 |
 | 7. Turn List & Version Navigation | v1.1 | 5/5 | Complete    | 2026-10-18 |
 | 8. Editable Code View | v1.1 | 6/6 | Complete    | 2026-10-18 |
-| 9. E2E, Demo GIF & Docs | v1.1 | 0/0 | Not started | - |
+| 9. E2E, Demo GIF & Docs | v1.1 | 0/3 | Planned | - |
