@@ -1,43 +1,32 @@
 /// <reference types="vitest/globals" />
-import { EXAMPLE_PROMPTS } from "./example-prompts";
+import { MAX_PROMPT_LENGTH } from "./prompt-limits";
+import { EXAMPLE_CATEGORIES, EXAMPLE_PROMPTS } from "./example-prompts";
 
 describe("EXAMPLE_PROMPTS", () => {
-  it("tem exatamente 12 entradas na ordem travada", () => {
-    expect(EXAMPLE_PROMPTS.map((e) => e.id)).toEqual([
-      "botao",
-      "card",
-      "badge",
-      "input",
-      "toggle",
-      "navbar",
-      "modal",
-      "empty",
-      "pricing",
-      "avatar",
-      "alert",
-      "tabs",
+  it("covers every gallery category with 4 examples, in category order", () => {
+    expect(EXAMPLE_CATEGORIES.map((c) => c.label)).toEqual([
+      "Cards",
+      "Formulários",
+      "Dashboards",
+      "Tabelas",
+      "Menus",
+      "Básicos",
     ]);
+    for (const c of EXAMPLE_CATEGORIES) {
+      expect(EXAMPLE_PROMPTS.filter((e) => e.category === c.id)).toHaveLength(4);
+    }
   });
 
-  it("tem labels e ids unicos", () => {
-    expect(new Set(EXAMPLE_PROMPTS.map((e) => e.id)).size).toBe(12);
-    expect(new Set(EXAMPLE_PROMPTS.map((e) => e.label)).size).toBe(12);
+  it("has unique ids and labels", () => {
+    expect(new Set(EXAMPLE_PROMPTS.map((e) => e.id)).size).toBe(EXAMPLE_PROMPTS.length);
+    expect(new Set(EXAMPLE_PROMPTS.map((e) => e.label)).size).toBe(EXAMPLE_PROMPTS.length);
   });
 
-  it("mantem labels e prompts identicos a D-04", () => {
-    expect(EXAMPLE_PROMPTS.map((e) => [e.label, e.prompt])).toEqual([
-      ["Botão", "botão primário com ícone"],
-      ["Card", "card de produto com imagem, preço e botão comprar"],
-      ["Badge", "badge de status (sucesso, alerta, erro)"],
-      ["Input", "campo de busca com ícone à esquerda"],
-      ["Toggle", "interruptor de notificações com rótulo"],
-      ["Navbar", "barra de navegação com logo e links"],
-      ["Modal", "diálogo de confirmação com Cancelar e Confirmar"],
-      ["Empty", "estado vazio com ilustração e botão de ação"],
-      ["Pricing", "card de plano com preço, lista de benefícios e CTA"],
-      ["Avatar", "avatar com nome, cargo e status online"],
-      ["Alert", "alerta de erro com ícone e botão fechar"],
-      ["Tabs", "abas de perfil, com conteúdo em cada uma"],
-    ]);
+  it("are complete, ready-to-generate prompts that fit the field", () => {
+    for (const e of EXAMPLE_PROMPTS) {
+      expect(e.prompt.length).toBeGreaterThan(150);
+      expect(e.prompt.length).toBeLessThanOrEqual(MAX_PROMPT_LENGTH);
+      expect(e.label.length).toBeLessThanOrEqual(20);
+    }
   });
 });

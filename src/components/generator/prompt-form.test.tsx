@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PromptForm } from "@/components/generator/prompt-form";
+import { EXAMPLE_PROMPTS } from "@/lib/example-prompts";
 
 function Harness({
   onSubmit,
@@ -58,19 +59,47 @@ describe("PromptForm", () => {
   });
 
   describe("example chips", () => {
-    const BOTAO = "botão primário com ícone";
+    const PRODUTO = EXAMPLE_PROMPTS.find((e) => e.id === "product-card")!.prompt;
 
     function chip(name: string) {
       return screen.getByRole("button", { name: new RegExp(`^${name}:`) });
     }
 
-    it("renders 12 chips and no Exemplos heading", () => {
+    it("renders the first category's 4 chips and no Exemplos heading", () => {
       render(<Harness onSubmit={vi.fn()} onStop={vi.fn()} />);
       const chips = screen
         .getAllByRole("button")
         .filter((b) => b.hasAttribute("aria-pressed"));
-      expect(chips).toHaveLength(12);
+      expect(chips).toHaveLength(4);
+      expect(screen.getByRole("radio", { name: "Cards" })).toHaveAttribute(
+        "aria-checked",
+        "true",
+      );
       expect(screen.queryByText("Exemplos")).toBeNull();
+    });
+
+    it("switches the gallery category by click and with the arrow keys", async () => {
+      const user = userEvent.setup();
+      render(<Harness onSubmit={vi.fn()} onStop={vi.fn()} />);
+      await user.click(screen.getByRole("radio", { name: "Dashboards" }));
+      expect(chip("Kanban")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^Produto:/ })).toBeNull();
+
+      await user.keyboard("{ArrowRight}");
+      const tables = screen.getByRole("radio", { name: "Tabelas" });
+      expect(tables).toHaveAttribute("aria-checked", "true");
+      expect(tables).toHaveFocus();
+      expect(chip("Usuários")).toBeInTheDocument();
+
+      await user.keyboard("{ArrowLeft}{ArrowLeft}{ArrowLeft}{ArrowLeft}");
+      expect(screen.getByRole("radio", { name: "Básicos" })).toHaveAttribute(
+        "aria-checked",
+        "true",
+      );
+      // Only the checked category is a tab stop.
+      expect(
+        screen.getAllByRole("radio").filter((r) => r.tabIndex === 0),
+      ).toHaveLength(1);
     });
 
     it("fills the prompt on click without submitting", async () => {
@@ -78,45 +107,45 @@ describe("PromptForm", () => {
       const onSubmit = vi.fn();
       render(<Harness onSubmit={onSubmit} onStop={vi.fn()} />);
 
-      await user.click(chip("Botão"));
+      await user.click(chip("Produto"));
       expect(
         (screen.getByRole("textbox", { name: "Prompt" }) as HTMLTextAreaElement)
           .value,
-      ).toBe(BOTAO);
+      ).toBe(PRODUTO);
       expect(onSubmit).not.toHaveBeenCalled();
     });
 
     it("exposes full prompt as accessible name and title", () => {
       render(<Harness onSubmit={vi.fn()} onStop={vi.fn()} />);
-      const el = screen.getByRole("button", { name: `Botão: ${BOTAO}` });
-      expect(el.getAttribute("title")).toBe(BOTAO);
+      const el = screen.getByRole("button", { name: `Produto: ${PRODUTO}` });
+      expect(el.getAttribute("title")).toBe(PRODUTO);
     });
 
     it("highlights the selected chip until the prompt is edited", async () => {
       const user = userEvent.setup();
       render(<Harness onSubmit={vi.fn()} onStop={vi.fn()} />);
 
-      await user.click(chip("Botão"));
-      expect(chip("Botão").getAttribute("aria-pressed")).toBe("true");
+      await user.click(chip("Produto"));
+      expect(chip("Produto").getAttribute("aria-pressed")).toBe("true");
 
       await user.type(screen.getByRole("textbox", { name: "Prompt" }), "x");
-      expect(chip("Botão").getAttribute("aria-pressed")).toBe("false");
+      expect(chip("Produto").getAttribute("aria-pressed")).toBe("false");
     });
 
     it("clears the highlight after submitting even if text is unchanged", async () => {
       const user = userEvent.setup();
       render(<Harness onSubmit={vi.fn()} onStop={vi.fn()} />);
 
-      await user.click(chip("Botão"));
+      await user.click(chip("Produto"));
       await user.click(screen.getByRole("button", { name: "Gerar" }));
-      expect(chip("Botão").getAttribute("aria-pressed")).toBe("false");
+      expect(chip("Produto").getAttribute("aria-pressed")).toBe("false");
 
-      await user.click(chip("Card"));
+      await user.click(chip("Planos"));
       await user.type(
         screen.getByRole("textbox", { name: "Prompt" }),
         "{Control>}{Enter}{/Control}",
       );
-      expect(chip("Card").getAttribute("aria-pressed")).not.toBe("true");
+      expect(chip("Planos").getAttribute("aria-pressed")).not.toBe("true");
     });
 
     it("disables all chips while loading", () => {
@@ -132,7 +161,7 @@ describe("PromptForm", () => {
       const chips = screen
         .getAllByRole("button")
         .filter((b) => b.hasAttribute("aria-pressed"));
-      expect(chips).toHaveLength(12);
+      expect(chips).toHaveLength(4);
       for (const c of chips) expect((c as HTMLButtonElement).disabled).toBe(true);
     });
   });

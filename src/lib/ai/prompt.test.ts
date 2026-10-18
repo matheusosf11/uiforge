@@ -98,3 +98,17 @@ describe("buildUserPrompt", () => {
     expect(buildUserPrompt(p, "")).toBe(p);
   });
 });
+
+describe("design guide", () => {
+  it("is part of both modes, before the example and the edit rules", () => {
+    const g = buildSystem("generate");
+    expect(g).toContain("DESIGN GUIDE");
+    expect(g.indexOf("DESIGN GUIDE")).toBeLessThan(g.indexOf("ONE-SHOT EXAMPLE"));
+    expect(g).toMatch(/ONE accent color/);
+    expect(g).toMatch(/dark: variants/);
+    expect(g).toMatch(/focus-visible:ring-2/);
+    const e = buildSystem("edit");
+    expect(e).toContain("DESIGN GUIDE");
+    expect(e).toMatch(/existing visual language/);
+  });
+});

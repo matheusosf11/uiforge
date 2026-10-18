@@ -12,7 +12,11 @@ import type {
 import { ImagePlus, X } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { EXAMPLE_PROMPTS } from "@/lib/example-prompts";
+import {
+  EXAMPLE_CATEGORIES,
+  EXAMPLE_PROMPTS,
+  type ExampleCategory,
+} from "@/lib/example-prompts";
 import { IMAGE_MEDIA_TYPES, MAX_IMAGES } from "@/lib/prompt-image";
 import { MAX_PROMPT_LENGTH } from "@/lib/prompt-limits";
 import { cn } from "@/lib/utils";
@@ -54,6 +58,62 @@ function imageFiles(files: FileList | File[] | null | undefined): File[] {
 
 const SKELETON_WIDTHS = ["w-24", "w-32", "w-28", "w-20"];
 
+// Gallery categories as a radio group: one tab stop, arrows move between them.
+function CategoryPicker({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: ExampleCategory;
+  onChange: (c: ExampleCategory) => void;
+  disabled: boolean;
+}) {
+  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    const step =
+      event.key === "ArrowRight" || event.key === "ArrowDown"
+        ? 1
+        : event.key === "ArrowLeft" || event.key === "ArrowUp"
+          ? -1
+          : 0;
+    if (step === 0) return;
+    event.preventDefault();
+    const ids = EXAMPLE_CATEGORIES.map((c) => c.id);
+    const next = ids[(ids.indexOf(value) + step + ids.length) % ids.length];
+    onChange(next);
+    event.currentTarget
+      .querySelector<HTMLButtonElement>(`[data-category="${next}"]`)
+      ?.focus();
+  }
+
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Categoria de exemplos"
+      className="mt-3 flex flex-wrap gap-1"
+      onKeyDown={handleKeyDown}
+    >
+      {EXAMPLE_CATEGORIES.map((c) => (
+        <button
+          key={c.id}
+          type="button"
+          role="radio"
+          aria-checked={value === c.id}
+          tabIndex={value === c.id ? 0 : -1}
+          data-category={c.id}
+          disabled={disabled}
+          onClick={() => onChange(c.id)}
+          className={cn(
+            "rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground max-md:min-h-11",
+            value === c.id && "bg-muted font-medium text-foreground",
+          )}
+        >
+          {c.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function PromptForm({
   value,
   onChange,
@@ -75,11 +135,16 @@ export function PromptForm({
   const refine = mode === "refine";
   const canSubmit = !isLoading && value.trim() !== "";
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [category, setCategory] = useState<ExampleCategory>(
+    EXAMPLE_CATEGORIES[0].id,
+  );
   const innerRef = useRef<HTMLTextAreaElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const full = images.length >= MAX_IMAGES;
   const canAttach = !!onAttachImages && !isLoading && !imageBusy && !full;
-  const items = refine ? (chips ?? []) : EXAMPLE_PROMPTS;
+  const items = refine
+    ? (chips ?? [])
+    : EXAMPLE_PROMPTS.filter((e) => e.category === category);
   const showSkeleton = refine && chips == null;
   const selected = refine
     ? items.find((e) => e.prompt === value)
@@ -249,31 +314,43 @@ export function PromptForm({
             ))}
           </div>
         ) : (
-          <div
-            role="group"
-            aria-label={refine ? "Sugestões de refinamento" : "Exemplos"}
-            className="mt-3 flex min-h-8 flex-wrap gap-2"
-          >
-            {items.map((e) => (
-              <button
-                key={e.id}
-                type="button"
-                title={e.prompt}
-                aria-label={`${e.label}: ${e.prompt}`}
-                aria-pressed={selected?.id === e.id}
+          <>
+            {refine ? null : (
+              <CategoryPicker
+                value={category}
+                onChange={setCategory}
                 disabled={isLoading}
-                onClick={() => pick(e.prompt, e.id)}
-                className={cn(
-                  buttonVariants({ variant: "outline", size: "sm" }),
-                  "text-xs max-md:min-h-11",
-                  selected?.id === e.id &&
-                    "border-transparent bg-primary text-primary-foreground",
-                )}
-              >
-                {e.label}
-              </button>
-            ))}
-          </div>
+              />
+            )}
+            <div
+              role="group"
+              aria-label={refine ? "Sugestões de refinamento" : "Exemplos"}
+              className={cn(
+                "flex min-h-8 flex-wrap gap-2",
+                refine ? "mt-3" : "mt-2",
+              )}
+            >
+              {items.map((e) => (
+                <button
+                  key={e.id}
+                  type="button"
+                  title={e.prompt}
+                  aria-label={`${e.label}: ${e.prompt}`}
+                  aria-pressed={selected?.id === e.id}
+                  disabled={isLoading}
+                  onClick={() => pick(e.prompt, e.id)}
+                  className={cn(
+                    buttonVariants({ variant: "outline", size: "sm" }),
+                    "text-xs max-md:min-h-11",
+                    selected?.id === e.id &&
+                      "border-transparent bg-primary text-primary-foreground",
+                  )}
+                >
+                  {e.label}
+                </button>
+              ))}
+            </div>
+          </>
         )}
         <div className="mt-3 flex items-center gap-2">
           <button
