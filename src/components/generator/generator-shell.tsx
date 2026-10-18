@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { FilePlus2, RotateCcw } from "lucide-react";
 import { CodeView } from "@/components/generator/code-view";
+import { DiscardDraftDialog } from "@/components/generator/discard-draft-dialog";
 import { NewComponentDialog } from "@/components/generator/new-component-dialog";
 import { PromptForm } from "@/components/generator/prompt-form";
 import { SessionBar } from "@/components/generator/session-bar";
@@ -21,7 +22,7 @@ import {
   REFINE_ERROR_MESSAGE,
 } from "@/lib/generate-error";
 import { parseCode } from "@/lib/parse-code";
-import { currentNumber, laterRange } from "@/lib/session";
+import { currentNumber, laterRange, versionNumber } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
 const SandboxPreview = dynamic(
@@ -73,6 +74,12 @@ export function GeneratorShell() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const newBtnRef = useRef<HTMLButtonElement | null>(null);
+  // D-09: pending "go to a later version" while a draft exists.
+  const [discardTarget, setDiscardTarget] = useState<{
+    id: number;
+    number: number;
+  } | null>(null);
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
 
   const suggestions = useSuggestions(
     committed ? { id: committed.id, code: committed.code } : null,
@@ -139,12 +146,24 @@ export function GeneratorShell() {
       ? `${committed.id}:${state.nextVersionId}:${state.cursor}`
       : null;
 
-  // Single source of the status text (D-16, D-20).
+  // Single source of the status text (D-16, D-20). D-15: a manual version
+  // saved by the same action prefixes the follow-up (React batches the
+  // commit and the action into one render, so the status is composite).
+  const savedIndex =
+    state.savedManualId === null
+      ? -1
+      : versions.findIndex((v) => v.id === state.savedManualId);
+  const saved =
+    savedIndex >= 0
+      ? `Edição salva como v${versionNumber(state, savedIndex)}`
+      : null;
+  const prefix = saved ? `${saved} · ` : "";
   let status = "";
-  if (pending) status = committed ? "Refinando…" : "Gerando…";
+  if (pending) status = prefix + (committed ? "Refinando…" : "Gerando…");
+  else if (notice === "manual") status = saved ?? "";
   else if (notice === "committed") status = `Pronto — v${n}`;
-  else if (notice === "undo") status = `Voltou para v${n}`;
-  else if (notice === "forward") status = `Foi para v${n}`;
+  else if (notice === "undo") status = prefix + `Voltou para v${n}`;
+  else if (notice === "forward") status = prefix + `Foi para v${n}`;
   else if (notice === "reset") status = "Novo componente iniciado";
 
   // D-09/D-10/D-11: streaming row while pending (Parar clears it); error row
@@ -182,14 +201,16 @@ export function GeneratorShell() {
   }
 
   async function handleSubmit() {
-    const outcome = await session.send(prompt.trim());
+    // D-07/D-10: the draft (broken or oversized, as-is) is committed as a
+    // manual version only when the refine actually starts.
+    const outcome = await session.send(prompt.trim(), draftCode);
     // D-02: clear only when a version was committed.
     if (outcome === "committed") setPrompt("");
   }
 
   async function handleRetry() {
     const instruction = error?.instruction ?? "";
-    const outcome = await session.retry();
+    const outcome = await session.retry(draftCode);
     // D-02: a committed retry clears the field like a submit, unless the user
     // already edited it into a different draft meanwhile.
     if (outcome === "committed") {
@@ -197,15 +218,49 @@ export function GeneratorShell() {
     }
   }
 
+  // D-07: commit the draft, then undo. COMMIT_MANUAL + UNDO lands back on the
+  // draft's base id, so the stale-draft effect cannot fire; clear explicitly
+  // (a draft never survives an undo) so a second Desfazer never duplicates.
+  function handleUndo() {
+    session.undo(draftCode);
+    setDraft(null);
+  }
+
+  function handleRestore(versionId: number) {
+    const idx = versions.findIndex((v) => v.id === versionId);
+    if (dirty && idx > cursor) {
+      // D-09: going forward would drop the draft; ask first, no commit.
+      restoreFocusRef.current =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
+      setDiscardTarget({ id: versionId, number: versionNumber(state, idx) });
+      return;
+    }
+    // D-07/D-08: commit the draft (truncating later versions), then restore.
+    session.restore(versionId, draftCode);
+    setDraft(null);
+  }
+
+  function confirmDiscard() {
+    if (!discardTarget) return;
+    const id = discardTarget.id;
+    setDraft(null);
+    setDiscardTarget(null);
+    session.restore(id);
+  }
+
   function doReset() {
     session.reset();
+    setDraft(null);
     suggestions.reset();
     setHistoryOpen(false);
     // D-13: prompt text is intentionally preserved.
   }
 
   function requestNew() {
-    if (versions.length > 1) {
+    // D-07: a draft counts as manual work (Phase 6 D-12).
+    if (versions.length > 1 || dirty) {
       setConfirmOpen(true);
     } else {
       doReset();
@@ -213,10 +268,13 @@ export function GeneratorShell() {
     }
   }
 
+  // Desfazer also works on v1 while a draft exists.
+  const undoEnabled = canUndo || (dirty && !busy);
+
   useUndoShortcut({
-    enabled: canUndo,
-    dialogOpen: confirmOpen,
-    onUndo: session.undo,
+    enabled: undoEnabled,
+    dialogOpen: confirmOpen || discardTarget !== null,
+    onUndo: handleUndo,
   });
 
   function handleTabKeyDown(event: React.KeyboardEvent<HTMLButtonElement>) {
@@ -258,7 +316,8 @@ export function GeneratorShell() {
                 transient={transient}
                 open={historyOpen}
                 onOpenChange={setHistoryOpen}
-                onRestore={session.restore}
+                onRestore={handleRestore}
+                draftActive={dirty}
               />
             ) : null
           }
@@ -267,9 +326,9 @@ export function GeneratorShell() {
               <SessionBar
                 number={n ?? 1}
                 total={versions.length}
-                canUndo={canUndo}
+                canUndo={undoEnabled}
                 busy={busy}
-                onUndo={session.undo}
+                onUndo={handleUndo}
                 onNew={requestNew}
                 newButtonRef={newBtnRef}
               />
@@ -414,6 +473,16 @@ export function GeneratorShell() {
         finalFocusRef={newBtnRef}
         // Focus lands on the textarea via the dialog's finalFocus on confirm.
         confirmFocusRef={textareaRef}
+      />
+      <DiscardDraftDialog
+        open={discardTarget !== null}
+        onOpenChange={(o) => {
+          if (!o) setDiscardTarget(null);
+        }}
+        onConfirm={confirmDiscard}
+        baseNumber={n ?? 1}
+        targetNumber={discardTarget?.number ?? 1}
+        finalFocusRef={restoreFocusRef}
       />
     </div>
   );
