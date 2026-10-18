@@ -6,10 +6,9 @@ import {
   FALLBACK_SUGGESTIONS,
   fillWithFallback,
   sanitizeSuggestions,
+  SUGGEST_CLIENT_TIMEOUT_MS,
   type Suggestion,
 } from "@/lib/suggest";
-
-const SUGGEST_TIMEOUT_MS = 10_000;
 
 export function useSuggestions(
   current: { id: number; code: string } | null,
@@ -18,6 +17,12 @@ export function useSuggestions(
   const [cache, setCache] = useState<Record<number, Suggestion[]>>({});
   const cacheRef = useRef(cache);
   cacheRef.current = cache;
+  // Version ids whose cached list is a timeout fallback. Their chips are
+  // shown, but the cache entry is provisional: the next time that version
+  // becomes current (undo / revisit) it is fetched again, and a real answer
+  // replaces the fallback. Other failures (non-ok, 429, bad JSON) stay cached
+  // to avoid hammering a failing or rate-limited endpoint.
+  const provisionalRef = useRef<Set<number>>(new Set());
   const fetchImplRef = useRef(opts?.fetchImpl);
   fetchImplRef.current = opts?.fetchImpl;
 
@@ -28,16 +33,27 @@ export function useSuggestions(
 
   useEffect(() => {
     if (id === null || codeRef.current === null) return;
-    if (cacheRef.current[id] !== undefined) return;
+    if (
+      cacheRef.current[id] !== undefined &&
+      !provisionalRef.current.has(id)
+    ) {
+      return;
+    }
 
     const ac = new AbortController();
     let timedOut = false;
     const timer = setTimeout(() => {
       timedOut = true;
       ac.abort();
-    }, SUGGEST_TIMEOUT_MS);
-    const store = (list: Suggestion[]) =>
-      setCache((prev) => (prev[id] ? prev : { ...prev, [id]: list }));
+    }, SUGGEST_CLIENT_TIMEOUT_MS);
+    const store = (list: Suggestion[], provisional = false) => {
+      const replace = provisionalRef.current.has(id);
+      if (provisional) provisionalRef.current.add(id);
+      else provisionalRef.current.delete(id);
+      setCache((prev) =>
+        prev[id] && !replace ? prev : { ...prev, [id]: list },
+      );
+    };
 
     (async () => {
       try {
@@ -58,7 +74,7 @@ export function useSuggestions(
           (err as { name?: unknown } | null)?.name === "AbortError";
         // Abort from id change/unmount: do not store. Timeout: fall back.
         if (aborted && !timedOut) return;
-        store(FALLBACK_SUGGESTIONS);
+        store(FALLBACK_SUGGESTIONS, timedOut);
       } finally {
         clearTimeout(timer);
       }
@@ -70,7 +86,10 @@ export function useSuggestions(
     };
   }, [id]);
 
-  const reset = useCallback(() => setCache({}), []);
+  const reset = useCallback(() => {
+    provisionalRef.current.clear();
+    setCache({});
+  }, []);
 
   return {
     suggestions: id !== null ? (cache[id] ?? null) : null,

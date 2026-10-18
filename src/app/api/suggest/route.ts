@@ -8,14 +8,20 @@ import {
   clientIp,
   getSuggestRateLimitConfig,
 } from "@/lib/rate-limit";
-import { MOCK_SUGGESTIONS, sanitizeSuggestions } from "@/lib/suggest";
+import {
+  MOCK_SUGGESTIONS,
+  sanitizeSuggestions,
+  SUGGEST_MODEL_TIMEOUT_MS,
+  SUGGEST_SERVER_BUDGET_MS,
+} from "@/lib/suggest";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
 // Thinking tokens count toward this budget.
 const MAX_OUTPUT_TOKENS = 2048;
-const TIMEOUT_MS = 8000;
+// Below this remaining budget, a model call is not worth starting.
+const MIN_MODEL_TIMEOUT_MS = 1000;
 // Same derivation as /api/generate: worst-case JSON escaping is 6 bytes per
 // UTF-16 unit; 30_000 code * 6 = 180_000 plus envelope, so 256_000 leaves margin.
 const MAX_BODY_BYTES = 256_000;
@@ -82,8 +88,13 @@ export async function POST(req: Request) {
     );
   }
 
+  // Total deadline for the whole chain (see SUGGEST_SERVER_BUDGET_MS): the
+  // client gives up after SUGGEST_CLIENT_TIMEOUT_MS, which is longer.
+  const deadline = Date.now() + SUGGEST_SERVER_BUDGET_MS;
   for (const model of getSuggestModels()) {
     if (req.signal.aborted) break;
+    const remaining = deadline - Date.now();
+    if (remaining < MIN_MODEL_TIMEOUT_MS) break;
     try {
       const result = await generateText({
         model,
@@ -91,7 +102,7 @@ export async function POST(req: Request) {
         system: buildSuggestSystem(),
         prompt: buildSuggestUser(code),
         maxOutputTokens: MAX_OUTPUT_TOKENS,
-        timeout: TIMEOUT_MS,
+        timeout: Math.min(SUGGEST_MODEL_TIMEOUT_MS, remaining),
         maxRetries: 0,
         abortSignal: req.signal,
       });

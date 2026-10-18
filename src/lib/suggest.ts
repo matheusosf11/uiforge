@@ -2,6 +2,15 @@
 
 export type Suggestion = { label: string; instruction: string };
 
+// Timing contract between /api/suggest and useSuggestions. The server tries
+// the model chain (flash-lite, then flash) within SUGGEST_SERVER_BUDGET_MS,
+// each model capped at SUGGEST_MODEL_TIMEOUT_MS, so the fallback model always
+// gets the remaining budget. The client waits longer than the server budget
+// (plus network headroom) so it never aborts while the fallback model runs.
+export const SUGGEST_MODEL_TIMEOUT_MS = 5_000;
+export const SUGGEST_SERVER_BUDGET_MS = 9_000;
+export const SUGGEST_CLIENT_TIMEOUT_MS = SUGGEST_SERVER_BUDGET_MS + 3_000;
+
 const MAX_SUGGESTIONS = 4;
 const MAX_LABEL = 30;
 const MAX_INSTRUCTION = 300;

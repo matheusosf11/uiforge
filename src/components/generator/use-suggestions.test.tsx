@@ -1,7 +1,11 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { FALLBACK_SUGGESTIONS } from "@/lib/suggest";
+import {
+  FALLBACK_SUGGESTIONS,
+  SUGGEST_CLIENT_TIMEOUT_MS,
+  SUGGEST_SERVER_BUDGET_MS,
+} from "@/lib/suggest";
 
 import { useSuggestions } from "./use-suggestions";
 
@@ -77,9 +81,59 @@ describe("useSuggestions", () => {
         ),
       );
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(10_001);
+        await vi.advanceTimersByTimeAsync(SUGGEST_CLIENT_TIMEOUT_MS + 1);
       });
       expect(result.current.suggestions).toEqual(FALLBACK_SUGGESTIONS);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("client timeout outlasts the server model-chain budget", () => {
+    expect(SUGGEST_CLIENT_TIMEOUT_MS).toBeGreaterThan(SUGGEST_SERVER_BUDGET_MS);
+  });
+
+  it("a timeout fallback is provisional: revisiting the version refetches", async () => {
+    vi.useFakeTimers();
+    try {
+      let hang = true;
+      const f = vi.fn((_u: string, init: RequestInit) =>
+        hang
+          ? new Promise<Response>((_res, rej) => {
+              init.signal?.addEventListener("abort", () =>
+                rej(new DOMException("aborted", "AbortError")),
+              );
+            })
+          : Promise.resolve(json([S("Real")])),
+      );
+      const { result, rerender } = renderHook(
+        ({ cur }: { cur: { id: number; code: string } }) =>
+          useSuggestions(cur, { fetchImpl: f as unknown as typeof fetch }),
+        { initialProps: { cur: { id: 1, code: "c1" } } },
+      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(SUGGEST_CLIENT_TIMEOUT_MS + 1);
+      });
+      expect(result.current.suggestions).toEqual(FALLBACK_SUGGESTIONS);
+
+      hang = false;
+      rerender({ cur: { id: 2, code: "c2" } });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      rerender({ cur: { id: 1, code: "c1" } });
+      // Fallback stays visible while the refetch runs (no skeleton flash).
+      expect(result.current.suggestions).toEqual(FALLBACK_SUGGESTIONS);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(f).toHaveBeenCalledTimes(3);
+      expect(result.current.suggestions![0].label).toBe("Real");
+
+      // A real answer is cached for good.
+      rerender({ cur: { id: 2, code: "c2" } });
+      rerender({ cur: { id: 1, code: "c1" } });
+      expect(f).toHaveBeenCalledTimes(3);
     } finally {
       vi.useRealTimers();
     }
