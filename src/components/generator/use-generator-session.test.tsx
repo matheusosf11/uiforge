@@ -333,4 +333,70 @@ describe("useGeneratorSession", () => {
     h.unmount();
     expect(signal?.aborted).toBe(true);
   });
+  it("restore moves the cursor back and forward without dropping versions", async () => {
+    const f = vi
+      .fn()
+      .mockImplementationOnce(async () => streamResponse([CODE]))
+      .mockImplementationOnce(async () => streamResponse([CODE2]));
+    const { result } = renderHook(() =>
+      useGeneratorSession({ fetchImpl: f as unknown as typeof fetch }),
+    );
+    await act(async () => {
+      await result.current.send("um");
+    });
+    await act(async () => {
+      await result.current.send("dois");
+    });
+    const [first, second] = result.current.state.versions;
+    act(() => result.current.restore(first.id));
+    expect(result.current.committed?.code).toBe(CODE);
+    expect(result.current.state.notice).toBe("undo");
+    expect(result.current.state.versions).toHaveLength(2);
+    act(() => result.current.restore(second.id));
+    expect(result.current.state.notice).toBe("forward");
+    expect(result.current.committed?.code).toBe(CODE2);
+  });
+
+  it("restore is ignored while a send is in flight", async () => {
+    const enc = new TextEncoder();
+    const f = vi
+      .fn()
+      .mockImplementationOnce(async () => streamResponse([CODE]))
+      .mockImplementationOnce(async () => streamResponse([CODE2]))
+      .mockImplementationOnce(async (_u: string, init: RequestInit) => {
+        const stream = new ReadableStream<Uint8Array>({
+          start(c) {
+            c.enqueue(enc.encode("export def"));
+            init.signal?.addEventListener("abort", () =>
+              c.error(new DOMException("aborted", "AbortError")),
+            );
+          },
+        });
+        return new Response(stream, { status: 200 });
+      });
+    const { result } = renderHook(() =>
+      useGeneratorSession({ fetchImpl: f as unknown as typeof fetch }),
+    );
+    await act(async () => {
+      await result.current.send("um");
+    });
+    await act(async () => {
+      await result.current.send("dois");
+    });
+    let pending: Promise<string>;
+    act(() => {
+      pending = result.current.send("tres");
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(result.current.busy).toBe(true);
+    act(() => result.current.restore(result.current.state.versions[0].id));
+    expect(result.current.state.cursor).toBe(1);
+    act(() => result.current.stop());
+    await act(async () => {
+      await pending!;
+    });
+    expect(result.current.state.cursor).toBe(1);
+  });
 });
