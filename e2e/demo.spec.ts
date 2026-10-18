@@ -57,12 +57,16 @@ test.describe("demo recording", () => {
     // 5. Manual edit: select the button label in the editor and type over it.
     const editor = page.getByRole("textbox", { name: "Editor de código" });
     await editor.click();
-    await editor.evaluate((el) => {
+    const start = await editor.evaluate((el) => {
       const ta = el as HTMLTextAreaElement;
-      const start = ta.value.indexOf("Acao");
-      ta.focus();
-      ta.setSelectionRange(start, start + "Acao".length);
+      const i = ta.value.indexOf("Acao");
+      if (i >= 0) {
+        ta.focus();
+        ta.setSelectionRange(i, i + "Acao".length);
+      }
+      return i;
     });
+    expect(start, "mock fixture must contain the 'Acao' label").toBeGreaterThanOrEqual(0);
     await page.waitForTimeout(500);
     await page.keyboard.type("Assinar agora", { delay: 60 });
     await expect(preview.getByText("Assinar agora").first()).toBeVisible({
