@@ -1,4 +1,4 @@
-[English](README.md) | Portugues (BR)
+[English](README.md) | Português (BR)
 
 # UIForge
 
