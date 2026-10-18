@@ -22,7 +22,7 @@
 - [x] **Phase 5: Refine API Contract & Edit Prompt** - Stateless `currentCode` contract, edit-mode prompt returning the full component, mock model extended for refine (completed 2026-10-17)
 - [x] **Phase 6: Session Core & Refine Loop** - Pure session reducer plus shell that refines by default, keeps previous version on failure, undo, reset and shortcuts (completed 2026-10-18)
 - [x] **Phase 7: Turn List & Version Navigation** - Accessible mini-chat list of turns that restores any version and shows the refine base (completed 2026-10-18)
-- [ ] **Phase 8: Editable Code View** - Syntax-highlighted editable code that live-updates preview and feeds the next refinement
+- [x] **Phase 8: Editable Code View** - Syntax-highlighted editable code that live-updates preview and feeds the next refinement (completed 2026-10-18)
 - [ ] **Phase 9: E2E, Demo GIF & Docs** - Full refine journey covered by e2e, recorded demo GIF, PT/EN READMEs updated
 
 ## Phase Details
@@ -94,7 +94,7 @@ Plans:
 - [x] 08-03-PLAN.md — SandboxPreview errorSource copy; turn list "rascunho" row + clickable current item; DiscardDraftDialog (D-09)
 - [x] 08-04-PLAN.md — Shell draft wiring: editable CodeView, 500 ms debounced preview, badge/discard/draft row, regenerate gating, export of the draft
 - [x] 08-05-PLAN.md — Shell commit-before-action: refine/undo/restore/retry with draft, D-09 dialog, Novo componente rule, composite status
-- [ ] 08-06-PLAN.md — E2E edit smoke + single guarded Playwright run and phase gate
+- [x] 08-06-PLAN.md — E2E edit smoke + single guarded Playwright run and phase gate
 **UI hint**: yes
 
 ### Phase 9: E2E, Demo GIF & Docs
@@ -118,5 +118,5 @@ Plans:
 | 5. Refine API Contract & Edit Prompt | v1.1 | 2/2 | Complete    | 2026-10-17 |
 | 6. Session Core & Refine Loop | v1.1 | 7/7 | Complete    | 2026-10-18 |
 | 7. Turn List & Version Navigation | v1.1 | 5/5 | Complete    | 2026-10-18 |
-| 8. Editable Code View | v1.1 | 5/6 | In Progress|  |
+| 8. Editable Code View | v1.1 | 6/6 | Complete   | 2026-10-18 |
 | 9. E2E, Demo GIF & Docs | v1.1 | 0/0 | Not started | - |
