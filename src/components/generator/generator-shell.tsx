@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { FilePlus2, RotateCcw } from "lucide-react";
 import { CodeView } from "@/components/generator/code-view";
@@ -8,6 +8,7 @@ import { NewComponentDialog } from "@/components/generator/new-component-dialog"
 import { PromptForm } from "@/components/generator/prompt-form";
 import { SessionBar } from "@/components/generator/session-bar";
 import { TurnList } from "@/components/generator/turn-list";
+import { useDebouncedDraft } from "@/components/generator/use-debounced-draft";
 import type { TurnTransient } from "@/components/generator/turn-list";
 import { useGeneratorSession } from "@/components/generator/use-generator-session";
 import { useSuggestions } from "@/components/generator/use-suggestions";
@@ -88,11 +89,55 @@ export function GeneratorShell() {
     [committed, suggestions.suggestions],
   );
 
-  // D-14: stream the new code live; pending clears on failure/stop, which
-  // reverts the panel to the last committed version.
-  const codeForPanel = pending
+  // D-06: shell-only draft of the current version. Text equal to the base is
+  // no draft; a draft whose base is no longer current never renders.
+  const [draft, setDraft] = useState<{ baseId: number; code: string } | null>(
+    null,
+  );
+  const dirty =
+    !!draft &&
+    !!committed &&
+    !pending &&
+    draft.baseId === committed.id &&
+    draft.code !== committed.code;
+  const draftCode = dirty ? draft.code : null;
+
+  // Drop a stale draft once the committed id moves away from its base (send,
+  // retry, REJECT, plain restore/undo). Flows that return to the draft's own
+  // base id (commit-then-undo/restore) clear it explicitly in their handlers.
+  const committedId = committed?.id ?? null;
+  const hasPending = !!pending;
+  useEffect(() => {
+    if (draft && draft.baseId !== committedId) setDraft(null);
+  }, [draft, committedId, hasPending]);
+
+  // D-14/D-05: stream the new code live; pending clears on failure/stop, which
+  // reverts the panel to the last committed version (or its draft).
+  const editorValue = pending
     ? parseCode(pending.text)
-    : (committed?.code ?? "");
+    : (draftCode ?? committed?.code ?? "");
+
+  // D-11: the preview follows the draft 500 ms after the last keystroke;
+  // null (discard, commit, restore, reset) passes through immediately.
+  const debounced = useDebouncedDraft(dirty ? draft : null, 500);
+  const previewCode =
+    dirty && debounced && committed && debounced.baseId === committed.id
+      ? debounced.code
+      : (committed?.code ?? "");
+
+  function handleEditorChange(next: string) {
+    if (!committed || busy) return;
+    setDraft(next === committed.code ? null : { baseId: committed.id, code: next });
+  }
+
+  // Changes on every commit and navigation, even when the committed id ends
+  // up the same (nextVersionId moved), so the editor's Ctrl+Z never brings
+  // back committed draft text (P3).
+  const versionKey = pending
+    ? `p${pending.id}`
+    : committed
+      ? `${committed.id}:${state.nextVersionId}:${state.cursor}`
+      : null;
 
   // Single source of the status text (D-16, D-20).
   let status = "";
@@ -104,11 +149,14 @@ export function GeneratorShell() {
 
   // D-09/D-10/D-11: streaming row while pending (Parar clears it); error row
   // only for a failed refine (a failed first generation has no list).
+  // D-14: precedence gerando > rascunho > erro.
   const transient: TurnTransient = pending
     ? { kind: "gerando", instruction: pending.instruction }
-    : error && versions.length > 0
-      ? { kind: "erro", instruction: error.instruction }
-      : null;
+    : dirty
+      ? { kind: "rascunho", instruction: "" }
+      : error && versions.length > 0
+        ? { kind: "erro", instruction: error.instruction }
+        : null;
 
   // D-15: later versions are discarded only when a refine commits.
   let baseNotice: string | null = null;
@@ -121,9 +169,7 @@ export function GeneratorShell() {
 
   // D-12: scroll the code panel to the top after a restore/undo.
   const scrollResetKey =
-    !pending && (notice === "undo" || notice === "forward")
-      ? (committed?.id ?? null)
-      : null;
+    !pending && (notice === "undo" || notice === "forward") ? versionKey : null;
 
   let errorMessage: string | null = null;
   if (error) {
@@ -315,14 +361,20 @@ export function GeneratorShell() {
         >
           {committed ? (
             <SandboxPreview
-              code={committed.code}
+              code={previewCode}
               updating={!!pending}
+              // D-12: errors in a draft or a manual version are the user's code.
+              errorSource={
+                dirty || committed.source === "manual" ? "user" : "ai"
+              }
               regenerateLabel="Tentar de novo"
               // Mutually exclusive with the shell error banner's retry button.
               // WR-01: omitted when regenerating would discard later versions
               // or lacks a real base; refine and restore remain available.
+              // D-12: also omitted while a draft exists (canRegenerate is
+              // already false on a manual version).
               onRegenerate={
-                error || !session.canRegenerate
+                error || !session.canRegenerate || dirty
                   ? undefined
                   : () => void session.regenerate()
               }
@@ -341,9 +393,14 @@ export function GeneratorShell() {
           className={cn("min-h-0 min-w-0 flex-1", tab !== "code" && "max-md:hidden")}
         >
           <CodeView
-            code={codeForPanel}
+            code={editorValue}
             busy={busy}
             scrollResetKey={scrollResetKey}
+            onChange={handleEditorChange}
+            readOnly={busy || !committed}
+            dirty={dirty}
+            onDiscard={() => setDraft(null)}
+            historyKey={versionKey}
           />
         </div>
       </div>
