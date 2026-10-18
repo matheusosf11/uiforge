@@ -4,8 +4,9 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 import { Highlight, themes } from "prism-react-renderer";
 import Editor from "react-simple-code-editor";
-import { Check, Copy, Download, GitCompare, X } from "lucide-react";
+import { BookOpen, Check, Copy, Download, GitCompare, X } from "lucide-react";
 import { useTheme } from "next-themes";
+import { UsageDialog } from "@/components/generator/usage-dialog";
 import { Button } from "@/components/ui/button";
 import { componentFilename } from "@/lib/download-filename";
 import { cn } from "@/lib/utils";
@@ -102,6 +103,8 @@ export function CodeView({
   const timeoutRef = useRef<number | null>(null);
   const [copyState, setCopyState] = useState<CopyState>("idle");
   const [exitMode, setExitMode] = useState(false);
+  const [usageOpen, setUsageOpen] = useState(false);
+  const usageBtnRef = useRef<HTMLButtonElement>(null);
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
@@ -306,6 +309,19 @@ export function CodeView({
             <Download />
             Baixar
           </Button>
+          <Button
+            ref={usageBtnRef}
+            type="button"
+            variant="outline"
+            size="sm"
+            className="text-xs max-md:min-h-11"
+            disabled={disabled}
+            onClick={() => setUsageOpen(true)}
+            title="Instruções e pacote .zip para usar em outro projeto"
+          >
+            <BookOpen aria-hidden />
+            Como usar
+          </Button>
         </div>
       </div>
       {comparing && compare !== null ? (
@@ -370,6 +386,12 @@ export function CodeView({
           O código gerado aparecerá aqui.
         </p>
       )}
+      <UsageDialog
+        open={usageOpen && !disabled}
+        onOpenChange={setUsageOpen}
+        code={code}
+        finalFocusRef={usageBtnRef}
+      />
     </section>
   );
 }

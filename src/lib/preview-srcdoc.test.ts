@@ -72,6 +72,15 @@ describe("buildPreviewSrcdoc", () => {
     expect(srcdoc).not.toContain("light dark");
   });
 
+  it("dark theme sets the dark class, scheme and background, and dark: follows the class", () => {
+    const srcdoc = buildPreviewSrcdoc(SAMPLE, { theme: "dark" });
+    expect(srcdoc).toContain('<html class="dark">');
+    expect(srcdoc).toContain('<meta name="color-scheme" content="dark"');
+    expect(srcdoc).toContain("background: #020617");
+    expect(srcdoc).toContain("@custom-variant dark (&:where(.dark, .dark *));");
+    expect(buildPreviewSrcdoc(SAMPLE)).toContain("<html>");
+  });
+
   it("does not execute generated code on the host document", () => {
     const srcdoc = buildPreviewSrcdoc(SAMPLE);
     expect(srcdoc).toContain("const __Generated = function Button()");

@@ -1,5 +1,6 @@
 /// <reference types="vitest/globals" />
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import {
   PREVIEW_LOAD_TIMEOUT_MS,
   SandboxPreview,
@@ -145,7 +146,9 @@ describe("SandboxPreview", () => {
     it("renders no regenerate button without onRegenerate", () => {
       render(<SandboxPreview code={valid} errorSource="user" />);
       postError();
-      expect(screen.queryByRole("button")).toBeNull();
+      expect(
+        within(screen.getByRole("alert")).queryByRole("button"),
+      ).toBeNull();
     });
 
     it("clears the runtime error when the code is fixed", () => {
@@ -184,6 +187,55 @@ describe("SandboxPreview", () => {
       post({ type: "uiforge-preview-error", message: "real" });
     });
     expect(screen.getByRole("alert")).toHaveTextContent("real");
+  });
+
+  describe("device size and theme", () => {
+    afterEach(() => window.localStorage.clear());
+    const code = "export default function A(){return <div/>}";
+
+    it("switches between desktop, tablet and celular widths", async () => {
+      const user = userEvent.setup();
+      render(<SandboxPreview code={code} />);
+      const viewport = screen.getByTestId("preview-viewport");
+      expect(screen.getByRole("radio", { name: "Desktop" })).toHaveAttribute("aria-checked", "true");
+      expect(viewport.style.width).toBe("");
+
+      await user.click(screen.getByRole("radio", { name: "Celular (375px)" }));
+      expect(viewport.style.width).toBe("375px");
+      await user.keyboard("{ArrowLeft}");
+      expect(screen.getByRole("radio", { name: "Tablet (768px)" })).toHaveFocus();
+      expect(viewport.style.width).toBe("768px");
+      // Remembered for the next visit.
+      expect(JSON.parse(window.localStorage.getItem("uiforge:preview-prefs")!)).toMatchObject({
+        device: "tablet",
+      });
+    });
+
+    it("renders the component on a dark page when the theme is toggled", async () => {
+      const user = userEvent.setup();
+      render(<SandboxPreview code={code} />);
+      const toggle = screen.getByRole("button", { name: "Preview no modo escuro" });
+      expect(toggle).toHaveAttribute("aria-pressed", "false");
+      await user.click(toggle);
+      expect(toggle).toHaveAttribute("aria-pressed", "true");
+      // The dark document loads behind the light one until it is ready.
+      const back = screen.getByTitle("Live preview (carregando)");
+      expect(back.getAttribute("srcdoc")).toContain('<html class="dark">');
+      expect(back.style.colorScheme).toBe("dark");
+    });
+
+    it("restores the saved device and theme", () => {
+      window.localStorage.setItem(
+        "uiforge:preview-prefs",
+        JSON.stringify({ device: "mobile", theme: "dark" }),
+      );
+      render(<SandboxPreview code={code} />);
+      expect(screen.getByTestId("preview-viewport").style.width).toBe("375px");
+      expect(screen.getByRole("button", { name: "Preview no modo escuro" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+    });
   });
 
   describe("load timeout", () => {

@@ -31,20 +31,37 @@ export const PREVIEW_RUNTIME = {
   babel: "/preview-runtime/babel-standalone-7.28.5.min.js",
 } as const;
 
-export function buildPreviewSrcdoc(code: string): string {
+export type PreviewTheme = "light" | "dark";
+
+// Page colors behind the component in each preview theme.
+const THEME_COLORS: Record<PreviewTheme, { background: string; color: string }> = {
+  light: { background: "#fff", color: "#0f172a" },
+  dark: { background: "#020617", color: "#e2e8f0" },
+};
+
+export function buildPreviewSrcdoc(
+  code: string,
+  opts: { theme?: PreviewTheme } = {},
+): string {
+  const theme = opts.theme ?? "light";
+  const colors = THEME_COLORS[theme];
   const rewritten = rewriteGeneratedCodeForPreview(code);
   const payload = JSON.stringify(rewritten).replace(/</g, "\\u003c");
 
   return `<!DOCTYPE html>
-<html>
+<html${theme === "dark" ? ' class="dark"' : ""}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="color-scheme" content="light" />
+    <meta name="color-scheme" content="${theme}" />
     <script src="${PREVIEW_RUNTIME.tailwind}"></script>
+    <style type="text/tailwindcss">
+      /* dark: utilities follow the "dark" class on <html>, not the OS. */
+      @custom-variant dark (&:where(.dark, .dark *));
+    </style>
     <style>
-      html { color-scheme: light; }
-      html, body, #root { margin: 0; min-height: 100%; background: #fff; color: #0f172a; }
+      html { color-scheme: ${theme}; }
+      html, body, #root { margin: 0; min-height: 100%; background: ${colors.background}; color: ${colors.color}; }
       body { font-family: ui-sans-serif, system-ui, sans-serif; padding: 1.5rem; }
       #uiforge-error {
         display: none;

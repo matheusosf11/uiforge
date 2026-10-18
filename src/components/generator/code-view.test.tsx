@@ -1,6 +1,6 @@
 /// <reference types="vitest/globals" />
 import { useState } from "react";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { themes } from "prism-react-renderer";
 import { CodeView } from "@/components/generator/code-view";
@@ -186,13 +186,13 @@ describe("CodeView editing and keyboard", () => {
     expect(editor()).toHaveValue("abc");
   });
 
-  it("Escape then Shift+Tab moves focus to Baixar", async () => {
+  it("Escape then Shift+Tab moves focus to Como usar", async () => {
     const user = userEvent.setup();
     const spy = vi.fn();
     render(<Harness initial="abc" spy={spy} after />);
     await user.click(editor());
     await user.keyboard("{Escape}{Shift>}{Tab}{/Shift}");
-    expect(screen.getByRole("button", { name: "Baixar" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Como usar" })).toHaveFocus();
     expect(spy).not.toHaveBeenCalled();
   });
 
@@ -325,7 +325,7 @@ describe("CodeView draft header", () => {
     const buttons = screen
       .getAllByRole("button")
       .map((b) => b.textContent);
-    expect(buttons).toEqual(["Descartar edições", "Copiar", "Baixar"]);
+    expect(buttons).toEqual(["Descartar edições", "Copiar", "Baixar", "Como usar"]);
 
     await user.click(screen.getByRole("button", { name: "Descartar edições" }));
     expect(onDiscard).toHaveBeenCalledTimes(1);
@@ -403,6 +403,43 @@ describe("CodeView export", () => {
     expect(createObjectURL).toHaveBeenCalledTimes(1);
     const blob = (createObjectURL.mock.calls[0] as unknown[])[0] as Blob;
     expect(await blob.text()).toBe(DRAFT);
+  });
+});
+
+describe("CodeView Como usar", () => {
+  it("lists the steps for this component and downloads a .zip package", async () => {
+    const user = userEvent.setup();
+    const createObjectURL = vi.fn(() => "blob:zip");
+    Object.defineProperty(URL, "createObjectURL", { value: createObjectURL, configurable: true });
+    Object.defineProperty(URL, "revokeObjectURL", { value: vi.fn(), configurable: true });
+    let downloaded = "";
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      downloaded = this.download;
+    });
+    const code = "export default function PriceCard() { return <div />; }";
+    render(<CodeView code={code} onChange={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: "Como usar" }));
+    const dialog = await screen.findByRole("dialog", { name: "Usar PriceCard.tsx em outro projeto" });
+    expect(within(dialog).getByText("5. Use o componente")).toBeInTheDocument();
+    expect(within(dialog).getByText(/import PriceCard from/)).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "Baixar pacote (.zip)" }));
+    expect(downloaded).toBe("PriceCard.zip");
+    const blob = (createObjectURL.mock.calls[0] as unknown[])[0] as Blob;
+    expect(blob.type).toBe("application/zip");
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    const text = new TextDecoder().decode(bytes);
+    expect(text).toContain("PriceCard.tsx");
+    expect(text).toContain("README.md");
+    expect(text).toContain(code);
+  });
+
+  it("is disabled without code", () => {
+    render(<CodeView code="" />);
+    expect(screen.getByRole("button", { name: "Como usar" })).toBeDisabled();
   });
 });
 
