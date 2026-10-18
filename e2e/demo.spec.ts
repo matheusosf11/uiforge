@@ -32,7 +32,7 @@ test.describe("demo recording", () => {
 
     // 2. Generate.
     await page.getByRole("button", { name: "Gerar" }).click();
-    await expect(page.getByText("Pronto — v1")).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText("Pronto — v1", { exact: true })).toBeVisible({ timeout: 15000 });
     await expect(preview.getByText("FixtureCard").first()).toBeVisible({ timeout: 20000 });
     await page.waitForTimeout(PAUSE);
 
@@ -42,7 +42,7 @@ test.describe("demo recording", () => {
     await chip.click();
     await page.waitForTimeout(900);
     await page.getByRole("button", { name: "Refinar", exact: true }).click();
-    await expect(page.getByText("Pronto — v2")).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText("Pronto — v2", { exact: true })).toBeVisible({ timeout: 15000 });
     await expect(page.locator(IFRAME)).toHaveAttribute("srcdoc", /Refinado/, {
       timeout: 15000,
     });
@@ -51,7 +51,7 @@ test.describe("demo recording", () => {
 
     // 4. Undo back to v1.
     await page.getByRole("button", { name: "Desfazer" }).click();
-    await expect(page.getByText("Voltou para v1")).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText("Voltou para v1", { exact: true })).toBeVisible({ timeout: 15000 });
     await page.waitForTimeout(PAUSE);
 
     // 5. Manual edit: select the button label in the editor and type over it.
