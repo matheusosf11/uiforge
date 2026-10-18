@@ -419,6 +419,14 @@ describe("COMMIT_MANUAL", () => {
     expect(sessionReducer(base, { type: "COMMIT_MANUAL", code: code(1) })).toBe(base);
   });
 
+  it("is a no-op for an empty or whitespace-only draft (IN-03)", () => {
+    const base = commit(initialSessionState, 1, code(1));
+    expect(sessionReducer(base, { type: "COMMIT_MANUAL", code: "" })).toBe(base);
+    expect(
+      sessionReducer(base, { type: "COMMIT_MANUAL", code: " \n\t " }),
+    ).toBe(base);
+  });
+
   it("is a no-op on the empty session", () => {
     expect(
       sessionReducer(initialSessionState, { type: "COMMIT_MANUAL", code: DRAFT }),

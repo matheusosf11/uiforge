@@ -1367,6 +1367,38 @@ describe("draft commit before actions", () => {
     expect(manualItems()).toHaveLength(1);
   });
 
+  it("an empty draft is never saved and the refine uses the committed code (IN-03)", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await generateFirst(user);
+    await screen.findByText("Pronto — v1");
+
+    fireEvent.change(editor(), { target: { value: "  \n " } });
+    expect(screen.getByText("Editado", { exact: true })).toBeInTheDocument();
+    await refine(user, "azul");
+    expect(await screen.findByText("Pronto — v2")).toBeInTheDocument();
+    expect(genBodies[genBodies.length - 1]).toEqual({
+      prompt: "azul",
+      currentCode: V1,
+    });
+    expect(manualItems()).toHaveLength(0);
+    expect(screen.getByText("v2 · 2 versões")).toBeInTheDocument();
+  });
+
+  it("Desfazer with an empty draft discards it without a manual version (IN-03)", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await twoVersions(user);
+
+    fireEvent.change(editor(), { target: { value: "" } });
+    expect(screen.getByText("Editado", { exact: true })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Desfazer/ }));
+    expect(await screen.findByText("Voltou para v1")).toBeInTheDocument();
+    expect(screen.getByText("v1 · 2 versões")).toBeInTheDocument();
+    expect(screen.queryByText("Editado", { exact: true })).toBeNull();
+    expect(editor()).toHaveValue(V1);
+  });
+
   it("an empty prompt with a draft creates no manual version", async () => {
     const user = userEvent.setup();
     render(<GeneratorShell />);

@@ -112,7 +112,9 @@ export function GeneratorShell() {
     !pending &&
     draft.baseId === committed.id &&
     draft.code !== committed.code;
-  const draftCode = dirty ? draft.code : null;
+  // IN-03: an empty (whitespace-only) draft is never committed; actions treat
+  // it as no draft and run from the committed code, which discards it.
+  const draftCode = dirty && draft.code.trim() ? draft.code : null;
 
   // Drop a stale draft once the committed id moves away from its base (send,
   // retry, REJECT, plain restore/undo). Flows that return to the draft's own

@@ -240,10 +240,14 @@ export function sessionReducer(
     case "COMMIT_MANUAL": {
       // D-05: never while streaming. D-06: an equal draft is no draft.
       // D-10: saved as-is (no export default check); size is checked by the
-      // hook before any request.
+      // hook before any request. IN-03: an empty or whitespace-only draft is
+      // no draft either (refining it would send an empty currentCode, which
+      // the API treats as a fresh generation).
       if (state.pending !== null) return state;
       const base = committedVersion(state);
-      if (!base || action.code === base.code) return state;
+      if (!base || action.code === base.code || !action.code.trim()) {
+        return state;
+      }
       return appendVersion(
         state,
         state.versions.slice(0, state.cursor + 1),
