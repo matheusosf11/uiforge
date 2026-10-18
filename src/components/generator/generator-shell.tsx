@@ -123,12 +123,15 @@ export function GeneratorShell() {
     session.reset();
     suggestions.reset();
     // D-13: prompt text is intentionally preserved.
-    textareaRef.current?.focus();
   }
 
   function requestNew() {
-    if (versions.length > 1) setConfirmOpen(true);
-    else doReset();
+    if (versions.length > 1) {
+      setConfirmOpen(true);
+    } else {
+      doReset();
+      textareaRef.current?.focus();
+    }
   }
 
   useUndoShortcut({
@@ -296,6 +299,8 @@ export function GeneratorShell() {
           doReset();
         }}
         finalFocusRef={newBtnRef}
+        // Focus lands on the textarea via the dialog's finalFocus on confirm.
+        confirmFocusRef={textareaRef}
       />
     </div>
   );

@@ -321,6 +321,13 @@ describe("GeneratorShell", () => {
       "rascunho",
     );
     expect(screen.queryByText(/ de \d+$/)).toBeNull();
+    // UI-SPEC section 3: on confirm, focus moves to the textarea.
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    await waitFor(() =>
+      expect(screen.getByRole("textbox", { name: "Prompt" })).toHaveFocus(),
+    );
+    await new Promise((r) => setTimeout(r, 100));
+    expect(screen.getByRole("textbox", { name: "Prompt" })).toHaveFocus();
   });
 
   it("Novo componente with a single version resets immediately", async () => {
