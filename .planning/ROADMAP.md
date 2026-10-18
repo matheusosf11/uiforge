@@ -20,7 +20,7 @@
 ### 🚧 v1.1 Refinamento Iterativo (In Progress)
 
 - [x] **Phase 5: Refine API Contract & Edit Prompt** - Stateless `currentCode` contract, edit-mode prompt returning the full component, mock model extended for refine (completed 2026-10-17)
-- [ ] **Phase 6: Session Core & Refine Loop** - Pure session reducer plus shell that refines by default, keeps previous version on failure, undo, reset and shortcuts
+- [x] **Phase 6: Session Core & Refine Loop** - Pure session reducer plus shell that refines by default, keeps previous version on failure, undo, reset and shortcuts (completed 2026-10-18)
 - [ ] **Phase 7: Turn List & Version Navigation** - Accessible mini-chat list of turns that restores any version and shows the refine base
 - [ ] **Phase 8: Editable Code View** - Syntax-highlighted editable code that live-updates preview and feeds the next refinement
 - [ ] **Phase 9: E2E, Demo GIF & Docs** - Full refine journey covered by e2e, recorded demo GIF, PT/EN READMEs updated
@@ -101,7 +101,7 @@
 | 3. Export, Examples & Accessible UX | v1.0 | 3/3 | Complete | 2026-10-15 |
 | 4. Quality Gate & Deploy | v1.0 | 8/8 | Complete | 2026-10-16 |
 | 5. Refine API Contract & Edit Prompt | v1.1 | 2/2 | Complete    | 2026-10-17 |
-| 6. Session Core & Refine Loop | v1.1 | 6/7 | In Progress|  |
+| 6. Session Core & Refine Loop | v1.1 | 7/7 | Complete   | 2026-10-18 |
 | 7. Turn List & Version Navigation | v1.1 | 0/0 | Not started | - |
 | 8. Editable Code View | v1.1 | 0/0 | Not started | - |
 | 9. E2E, Demo GIF & Docs | v1.1 | 0/0 | Not started | - |
