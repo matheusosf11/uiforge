@@ -3,9 +3,14 @@ import {
   MAX_VERSIONS,
   canUndo,
   committedVersion,
+  currentNumber,
+  displayNumber,
+  hasDroppedVersions,
   initialSessionState,
   isBusy,
+  laterRange,
   sessionReducer,
+  versionNumber,
   type SessionAction,
   type SessionState,
 } from "@/lib/session";
@@ -209,6 +214,13 @@ describe("sessionReducer", () => {
     expect(s.cursor).toBe(MAX_VERSIONS - 1);
     expect(s.versions[0].id).toBe(2);
     expect(s.versions[MAX_VERSIONS - 1].id).toBe(MAX_VERSIONS + 1);
+    expect(s.droppedCount).toBe(1);
+    expect(versionNumber(s, 0)).toBe(2);
+    expect(currentNumber(s)).toBe(MAX_VERSIONS + 1);
+    expect(hasDroppedVersions(s)).toBe(true);
+    s = commit(s, MAX_VERSIONS + 2, code(MAX_VERSIONS + 2));
+    expect(s.droppedCount).toBe(2);
+    expect(currentNumber(s)).toBe(MAX_VERSIONS + 2);
   });
 
   it("RESET clears everything but keeps nextVersionId", () => {
@@ -221,5 +233,128 @@ describe("sessionReducer", () => {
     expect(s.notice).toBe("reset");
     expect(s.nextVersionId).toBe(3);
     expect(committedVersion(s)).toBeNull();
+    expect(s.droppedCount).toBe(0);
+    s = commit(s, 3, code(3));
+    expect(s.versions[0].id).toBe(3);
+    expect(currentNumber(s)).toBe(1);
+  });
+
+  it("RESET after the cap restarts numbering at v1", () => {
+    let s = initialSessionState;
+    for (let i = 1; i <= MAX_VERSIONS + 1; i++) s = commit(s, i, code(i));
+    s = sessionReducer(s, { type: "RESET" });
+    expect(s.droppedCount).toBe(0);
+    expect(hasDroppedVersions(s)).toBe(false);
+    s = commit(s, 99, code(99));
+    expect(currentNumber(s)).toBe(1);
+  });
+});
+
+function three() {
+  let s = initialSessionState;
+  for (let i = 1; i <= 3; i++) s = commit(s, i, code(i));
+  return s;
+}
+
+describe("RESTORE", () => {
+  it("backward restore moves the cursor with notice undo, keeps versions", () => {
+    const s = three();
+    const r = sessionReducer(s, { type: "RESTORE", versionId: s.versions[0].id });
+    expect(r.cursor).toBe(0);
+    expect(r.notice).toBe("undo");
+    expect(r.error).toBeNull();
+    expect(r.versions).toHaveLength(3);
+  });
+
+  it("forward restore uses notice forward", () => {
+    const u = sessionReducer(three(), { type: "UNDO" });
+    expect(u.cursor).toBe(1);
+    const r = sessionReducer(u, { type: "RESTORE", versionId: u.versions[2].id });
+    expect(r.cursor).toBe(2);
+    expect(r.notice).toBe("forward");
+  });
+
+  it("is a no-op while pending, for unknown ids and for the current id", () => {
+    const s = three();
+    const p = sessionReducer(s, { type: "START", id: 9, instruction: "a" });
+    expect(sessionReducer(p, { type: "RESTORE", versionId: s.versions[0].id })).toBe(p);
+    expect(sessionReducer(s, { type: "RESTORE", versionId: 12345 })).toBe(s);
+    expect(sessionReducer(s, { type: "RESTORE", versionId: s.versions[2].id })).toBe(s);
+  });
+
+  it("clears an existing error and keeps versions", () => {
+    const f = run(
+      [
+        { type: "START", id: 9, instruction: "r" },
+        { type: "FAIL", id: 9, kind: "failed" },
+      ],
+      three(),
+    );
+    expect(f.error).not.toBeNull();
+    const r = sessionReducer(f, { type: "RESTORE", versionId: f.versions[1].id });
+    expect(r.error).toBeNull();
+    expect(r.versions).toBe(f.versions);
+    expect(r.cursor).toBe(1);
+  });
+
+  it("refining after restoring v1 of 3 truncates later versions", () => {
+    const s = three();
+    const r = sessionReducer(s, { type: "RESTORE", versionId: s.versions[0].id });
+    const c = commit(r, 10, code(10), "new");
+    expect(c.versions).toHaveLength(2);
+    expect(c.cursor).toBe(1);
+    expect(versionNumber(c, c.cursor)).toBe(2);
+    expect(laterRange(c)).toBeNull();
+  });
+});
+
+describe("numbering selectors", () => {
+  it("displayNumber and currentNumber basics", () => {
+    expect(displayNumber(3, 0)).toBe(4);
+    expect(currentNumber(initialSessionState)).toBeNull();
+    expect(initialSessionState.droppedCount).toBe(0);
+  });
+
+  it("laterRange", () => {
+    expect(laterRange(initialSessionState)).toBeNull();
+    const s = three();
+    expect(laterRange(s)).toBeNull();
+    const r1 = sessionReducer(s, { type: "RESTORE", versionId: s.versions[0].id });
+    expect(laterRange(r1)).toEqual({ from: 2, to: 3 });
+    const r2 = sessionReducer(s, { type: "RESTORE", versionId: s.versions[1].id });
+    expect(laterRange(r2)).toEqual({ from: 3, to: 3 });
+  });
+
+  it("regenerate from cursor 0 after the cap keeps numbering at droppedCount + 1", () => {
+    let s = initialSessionState;
+    for (let i = 1; i <= MAX_VERSIONS + 1; i++) s = commit(s, i, code(i));
+    s = sessionReducer(s, { type: "RESTORE", versionId: s.versions[0].id });
+    expect(currentNumber(s)).toBe(2);
+    s = run(
+      [
+        { type: "START", id: 100, instruction: "again", baseId: null },
+        { type: "COMMIT", id: 100, raw: code(100) },
+      ],
+      s,
+    );
+    expect(s.versions).toHaveLength(1);
+    expect(s.droppedCount).toBe(1);
+    expect(currentNumber(s)).toBe(2);
+  });
+});
+
+describe("COMMIT with a removed base (IN-01)", () => {
+  it("keeps history and records a failed error", () => {
+    const base = three();
+    const s: SessionState = {
+      ...base,
+      pending: { id: 50, instruction: "refine", baseId: 999, text: "" },
+    };
+    const c = sessionReducer(s, { type: "COMMIT", id: 50, raw: code(50) });
+    expect(c.versions).toBe(base.versions);
+    expect(c.cursor).toBe(base.cursor);
+    expect(c.pending).toBeNull();
+    expect(c.error).toEqual({ kind: "failed", instruction: "refine", baseId: 999 });
+    expect(c.notice).toBeNull();
   });
 });
