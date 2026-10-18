@@ -22,11 +22,11 @@ Requirements for this milestone. Each maps to roadmap phases. IDs continue from 
 ### Version History & Turns
 
 - [x] **ITER-02**: User can undo to the previous version within the session (in memory, no persistence)
-- [ ] **HIST-01**: User sees a list of turns (prompts sent this session, mini-chat style) with per-turn status (gerando / ok / erro) and the current version highlighted
-- [ ] **HIST-02**: User can click a turn to restore that version in code and preview
-- [ ] **HIST-03**: Refining from an older version discards the versions after it; those versions appear dimmed after a restore and the UI shows the base ("Refinar a partir da vN")
-- [ ] **HIST-04**: Session history keeps at most 20 versions (oldest dropped)
-- [ ] **HIST-05**: Turn list is accessible: semantic list, `aria-current` on the active version, descriptive restore labels, status announced via `aria-live`, focus managed after restore/reset
+- [x] **HIST-01**: User sees a list of turns (prompts sent this session, mini-chat style) with per-turn status (gerando / ok / erro) and the current version highlighted
+- [x] **HIST-02**: User can click a turn to restore that version in code and preview
+- [x] **HIST-03**: Refining from an older version discards the versions after it; those versions appear dimmed after a restore and the UI shows the base ("Refinar a partir da vN")
+- [x] **HIST-04**: Session history keeps at most 20 versions (oldest dropped)
+- [x] **HIST-05**: Turn list is accessible: semantic list, `aria-current` on the active version, descriptive restore labels, status announced via `aria-live`, focus managed after restore/reset
 
 ### Editable Code
 
@@ -89,11 +89,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ITER-09 | Phase 6 | Complete |
 | QUAL-06 | Phase 6 | Complete |
 | UX-05 | Phase 6 | Complete |
-| HIST-01 | Phase 7 | Pending |
-| HIST-02 | Phase 7 | Pending |
-| HIST-03 | Phase 7 | Pending |
-| HIST-04 | Phase 7 | Pending |
-| HIST-05 | Phase 7 | Pending |
+| HIST-01 | Phase 7 | Complete |
+| HIST-02 | Phase 7 | Complete |
+| HIST-03 | Phase 7 | Complete |
+| HIST-04 | Phase 7 | Complete |
+| HIST-05 | Phase 7 | Complete |
 | EDIT-04 | Phase 8 | Pending |
 | EDIT-05 | Phase 8 | Pending |
 | EDIT-06 | Phase 8 | Pending |
