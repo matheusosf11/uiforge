@@ -39,7 +39,7 @@ A user types a prompt and gets working, previewable React + Tailwind component c
 - [x] In-memory version history within the session (go back to a previous version) — validated in Phases 6–7 (undo, restore any version, 20-version cap with stable numbering)
 - [x] Visible list of turns (prompts sent in the session, mini-chat style) — validated in Phase 7 (accessible turn list, gerando/erro status, restore, base notice)
 - [x] Editable code: user edits in the code view and refinement uses the edited version — validated in Phase 8 (react-simple-code-editor, 500 ms preview debounce, "Edição manual" versions committed before refine/undo/restore)
-- [ ] Demo GIF (`docs/demo.gif`) linked from both READMEs
+- [x] Demo GIF (`docs/demo.gif`) linked from both READMEs — validated in Phase 9 (recorded from the mock with `npm run demo:gif`, 2.85 MB; journey e2e added; READMEs PT/EN updated)
 
 ### Out of Scope
 
@@ -99,4 +99,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-18 — Phase 8 (editable code view) complete; site is dark-only by user decision*
+*Last updated: 2026-10-18 — Milestone v1.1 complete (Phases 5–9); site is dark-only by user decision; not yet pushed/deployed*

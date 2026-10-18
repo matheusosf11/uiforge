@@ -43,9 +43,9 @@ Requirements for this milestone. Each maps to roadmap phases. IDs continue from 
 ### Quality & Docs
 
 - [x] **QUAL-06**: Session/version logic is covered by unit tests (commit, undo, truncation, cap, abort/error, stale-chunk guard) and the refine API contract by route tests (backward-compatible `{prompt}` body)
-- [ ] **QUAL-07**: E2E covers generate → refine → undo → edit → refine-after-edit → failed refine keeps previous version, using the env-gated mock model extended for refine mode
-- [ ] **DOCS-01**: A demo GIF (`docs/demo.gif`, ≤ ~3 MB) recorded from the deterministic mock shows generate → refine → undo → manual edit, linked from both READMEs with alt text
-- [ ] **DOCS-02**: Both READMEs (PT/EN) document iterative refinement, version history, editable code, and the refine API contract
+- [x] **QUAL-07**: E2E covers generate → refine → undo → edit → refine-after-edit → failed refine keeps previous version, using the env-gated mock model extended for refine mode
+- [x] **DOCS-01**: A demo GIF (`docs/demo.gif`, ≤ ~3 MB) recorded from the deterministic mock shows generate → refine → undo → manual edit, linked from both READMEs with alt text
+- [x] **DOCS-02**: Both READMEs (PT/EN) document iterative refinement, version history, editable code, and the refine API contract
 
 ## Future Requirements
 
@@ -99,9 +99,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | EDIT-06 | Phase 8 | Complete |
 | EDIT-07 | Phase 8 | Complete |
 | EDIT-08 | Phase 8 | Complete |
-| DOCS-01 | Phase 9 | Pending |
-| DOCS-02 | Phase 9 | Pending |
-| QUAL-07 | Phase 9 | Pending |
+| DOCS-01 | Phase 9 | Complete |
+| DOCS-02 | Phase 9 | Complete |
+| QUAL-07 | Phase 9 | Complete |
 
 **Coverage:**
 - v1.1 requirements: 24 total
