@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   MAX_VERSIONS,
+  canRegenerate,
   canUndo,
   committedVersion,
   currentNumber,
@@ -325,21 +326,51 @@ describe("numbering selectors", () => {
     expect(laterRange(r2)).toEqual({ from: 3, to: 3 });
   });
 
-  it("regenerate from cursor 0 after the cap keeps numbering at droppedCount + 1", () => {
+  it("regenerate is not allowed at cursor 0 after the cap (WR-01)", () => {
     let s = initialSessionState;
     for (let i = 1; i <= MAX_VERSIONS + 1; i++) s = commit(s, i, code(i));
     s = sessionReducer(s, { type: "RESTORE", versionId: s.versions[0].id });
     expect(currentNumber(s)).toBe(2);
-    s = run(
-      [
-        { type: "START", id: 100, instruction: "again", baseId: null },
-        { type: "COMMIT", id: 100, raw: code(100) },
-      ],
-      s,
-    );
-    expect(s.versions).toHaveLength(1);
     expect(s.droppedCount).toBe(1);
-    expect(currentNumber(s)).toBe(2);
+    // The real parent was evicted and later versions exist: regenerating
+    // would wipe history and re-run a refine instruction as a fresh prompt.
+    expect(canRegenerate(s)).toBe(false);
+  });
+});
+
+describe("canRegenerate (WR-01)", () => {
+  it("is false on an empty session", () => {
+    expect(canRegenerate(initialSessionState)).toBe(false);
+  });
+
+  it("is true on v1 of an uncapped session (first generation)", () => {
+    expect(canRegenerate(commit(initialSessionState, 1, code(1)))).toBe(true);
+  });
+
+  it("is true on the last version when it has a parent", () => {
+    expect(canRegenerate(three())).toBe(true);
+  });
+
+  it("is false after restoring an earlier version (later versions exist)", () => {
+    const s = three();
+    for (const v of s.versions.slice(0, 2)) {
+      const r = sessionReducer(s, { type: "RESTORE", versionId: v.id });
+      expect(canRegenerate(r)).toBe(false);
+    }
+  });
+
+  it("is false when the only kept version's parent was evicted", () => {
+    const s: SessionState = {
+      ...commit(initialSessionState, 1, code(1)),
+      droppedCount: 5,
+    };
+    expect(canRegenerate(s)).toBe(false);
+  });
+
+  it("is true on the last version after the cap (parent still kept)", () => {
+    let s = initialSessionState;
+    for (let i = 1; i <= MAX_VERSIONS + 1; i++) s = commit(s, i, code(i));
+    expect(canRegenerate(s)).toBe(true);
   });
 });
 

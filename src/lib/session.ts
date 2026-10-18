@@ -102,6 +102,20 @@ export function laterRange(
   };
 }
 
+/**
+ * WR-01: whether the preview "Tentar de novo" (regenerate) may run. It re-runs
+ * the current version against its parent and COMMIT truncates to that parent,
+ * so it is only safe when the current version is the last kept one (no later
+ * versions to silently discard) and its real base still exists: a parent
+ * (cursor > 0) or, at cursor 0, a true first generation (nothing evicted).
+ */
+export function canRegenerate(state: SessionState): boolean {
+  if (state.cursor < 0 || state.cursor !== state.versions.length - 1) {
+    return false;
+  }
+  return state.cursor > 0 || state.droppedCount === 0;
+}
+
 /** True once the cap has evicted at least one version. */
 export function hasDroppedVersions(state: SessionState): boolean {
   return state.droppedCount > 0;

@@ -275,6 +275,37 @@ describe("useGeneratorSession", () => {
     expect(result.current.state.cursor).toBe(1);
   });
 
+  it("regenerate after restoring an earlier version is a no-op (WR-01)", async () => {
+    const f = vi
+      .fn()
+      .mockImplementationOnce(async () => streamResponse([CODE]))
+      .mockImplementationOnce(async () => streamResponse([CODE2]));
+    const { result } = renderHook(() =>
+      useGeneratorSession({ fetchImpl: f as unknown as typeof fetch }),
+    );
+    await act(async () => {
+      await result.current.send("um");
+    });
+    await act(async () => {
+      await result.current.send("dois");
+    });
+    act(() => {
+      result.current.restore(result.current.state.versions[0].id);
+    });
+    expect(result.current.canRegenerate).toBe(false);
+    let r = "";
+    await act(async () => {
+      r = await result.current.regenerate();
+    });
+    expect(r).toBe("ignored");
+    expect(f).toHaveBeenCalledTimes(2);
+    expect(result.current.state.versions.map((v) => v.code)).toEqual([
+      CODE,
+      CODE2,
+    ]);
+    expect(result.current.state.cursor).toBe(0);
+  });
+
   it("retry after a failed v1 regenerate stays in generate mode", async () => {
     const f = vi
       .fn()

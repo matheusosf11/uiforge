@@ -319,8 +319,12 @@ export function GeneratorShell() {
               updating={!!pending}
               regenerateLabel="Tentar de novo"
               // Mutually exclusive with the shell error banner's retry button.
+              // WR-01: omitted when regenerating would discard later versions
+              // or lacks a real base; refine and restore remain available.
               onRegenerate={
-                error ? undefined : () => void session.regenerate()
+                error || !session.canRegenerate
+                  ? undefined
+                  : () => void session.regenerate()
               }
               regenerateDisabled={busy}
             />

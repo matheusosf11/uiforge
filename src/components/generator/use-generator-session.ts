@@ -6,6 +6,7 @@ import { hasDefaultExport } from "@/lib/has-default-export";
 import { parseCode } from "@/lib/parse-code";
 import { MAX_CODE_LENGTH } from "@/lib/prompt-limits";
 import {
+  canRegenerate as selectCanRegenerate,
   canUndo as selectCanUndo,
   committedVersion,
   initialSessionState,
@@ -122,12 +123,14 @@ export function useGeneratorSession(opts?: { fetchImpl?: typeof fetch }) {
   // re-runs its instruction against the parent version, and COMMIT then
   // truncates so the broken version is replaced instead of kept. Versions
   // form a linear chain (COMMIT truncates to the base), so the parent is the
-  // previous index. Trade-off: once the 20-version cap has evicted the real
-  // first version, versions[0] is regenerated from its instruction alone.
+  // previous index. WR-01: a no-op unless canRegenerate (current is the last
+  // kept version and its real base exists), so it never silently discards
+  // later versions nor re-runs a refine instruction as a fresh prompt once
+  // the cap has evicted the real first version.
   const regenerate = useCallback(async (): Promise<SendResult> => {
     const s = stateRef.current;
     const current = committedVersion(s);
-    if (!current) return "ignored";
+    if (!current || !selectCanRegenerate(s)) return "ignored";
     const parent = s.cursor > 0 ? (s.versions[s.cursor - 1] ?? null) : null;
     return run(current.instruction, parent);
   }, [run]);
@@ -167,6 +170,7 @@ export function useGeneratorSession(opts?: { fetchImpl?: typeof fetch }) {
     committed,
     busy: isBusy(state),
     canUndo: selectCanUndo(state),
+    canRegenerate: selectCanRegenerate(state),
     send,
     retry,
     regenerate,

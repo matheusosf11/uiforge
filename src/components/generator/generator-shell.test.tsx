@@ -517,6 +517,78 @@ describe("turn list", () => {
     expect(screen.queryByText(/^Refinar a partir da/)).toBeNull();
   });
 
+  it("hides the preview regenerate after restoring an earlier version (WR-01)", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await twoVersions(user);
+    expect(
+      screen.getByRole("button", { name: "Preview: tentar de novo" }),
+    ).toBeInTheDocument();
+
+    await user.click(
+      within(list()).getByRole("button", {
+        name: "Restaurar v1: um card. Concluída.",
+      }),
+    );
+    await screen.findByText("Voltou para v1");
+    expect(
+      screen.queryByRole("button", { name: "Preview: tentar de novo" }),
+    ).toBeNull();
+    expect(genBodies).toHaveLength(2);
+  });
+
+  it("offers the preview regenerate again on the last version and it works as before (WR-01)", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await twoVersions(user);
+    await user.click(
+      within(list()).getByRole("button", {
+        name: "Restaurar v1: um card. Concluída.",
+      }),
+    );
+    await screen.findByText("Voltou para v1");
+    await user.click(
+      within(list()).getByRole("button", {
+        name: "Restaurar v2: azul. Concluída. Será descartada ao refinar.",
+      }),
+    );
+    await screen.findByText("Foi para v2");
+
+    await user.click(
+      screen.getByRole("button", { name: "Preview: tentar de novo" }),
+    );
+    await waitFor(() => expect(genBodies).toHaveLength(3));
+    expect(genBodies[2]).toEqual({
+      prompt: "azul",
+      currentCode: FIXED_COMPONENT.trim(),
+    });
+    expect(await screen.findByText("Pronto — v2")).toBeInTheDocument();
+    expect(screen.getByText("v2 · 2 versões")).toBeInTheDocument();
+  });
+
+  it("hides the preview regenerate at cursor 0 after the cap dropped versions (WR-01)", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await generateFirst(user);
+    await screen.findByText("Pronto — v1");
+    for (let i = 2; i <= 21; i++) {
+      await refine(user, `r${i}`);
+      await screen.findByText(`Pronto — v${i}`);
+    }
+    expect(
+      screen.getByText("Versões mais antigas descartadas (limite de 20)"),
+    ).toBeInTheDocument();
+
+    await user.click(
+      within(list()).getByRole("button", { name: /^Restaurar v2: r2\./ }),
+    );
+    await screen.findByText("Voltou para v2");
+    expect(
+      screen.queryByRole("button", { name: "Preview: tentar de novo" }),
+    ).toBeNull();
+    expect(genBodies).toHaveLength(21);
+  }, 30_000);
+
   it("scrolls the code panel to the top on restore", async () => {
     const user = userEvent.setup();
     render(<GeneratorShell />);
