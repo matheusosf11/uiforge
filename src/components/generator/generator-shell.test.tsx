@@ -1,5 +1,12 @@
 /// <reference types="vitest/globals" />
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { GeneratorShell } from "@/components/generator/generator-shell";
 import { FIXED_COMPONENT, REFINED_COMPONENT } from "@/lib/ai/mock-model";
@@ -934,11 +941,16 @@ describe("editable code", () => {
 
     await typeAtEnd(user, MARK);
     expect(screen.getByText("Editado", { exact: true })).toBeInTheDocument();
+    // D-07 (08-05): restoring an earlier version commits the draft first.
     await user.click(
       within(list()).getByRole("button", {
         name: "Restaurar v1: um card. Concluída.",
       }),
     );
+    expect(
+      await screen.findByText("Edição salva como v3 · Voltou para v1"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("v1 · 3 versões")).toBeInTheDocument();
     expect(screen.queryByText("Editado", { exact: true })).toBeNull();
     expect(editor()).toHaveValue(V1);
 
@@ -949,5 +961,341 @@ describe("editable code", () => {
     );
     expect(editor()).toHaveValue(V2);
     expect(screen.queryByText("Editado", { exact: true })).toBeNull();
+  });
+});
+
+function statusText() {
+  const el = document.querySelector('[aria-live="polite"]');
+  return el?.textContent ?? "";
+}
+
+function manualItems() {
+  return within(list())
+    .getAllByRole("button")
+    .filter((b) => /Edição manual\./.test(b.getAttribute("aria-label") ?? ""));
+}
+
+async function v1WithDraft(user: ReturnType<typeof userEvent.setup>) {
+  await generateFirst(user);
+  await screen.findByText("Pronto — v1");
+  await typeAtEnd(user, MARK);
+  expect(screen.getByText("Editado", { exact: true })).toBeInTheDocument();
+}
+
+async function restoreV1WithDraft(user: ReturnType<typeof userEvent.setup>) {
+  await twoVersions(user);
+  await user.click(
+    within(list()).getByRole("button", {
+      name: "Restaurar v1: um card. Concluída.",
+    }),
+  );
+  await screen.findByText("Voltou para v1");
+  await typeAtEnd(user, MARK);
+}
+
+describe("draft commit before actions", () => {
+  it("refine with a draft saves it first and sends the edited code (EDIT-06, D-15)", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await v1WithDraft(user);
+
+    behaviors.push("hang");
+    await refine(user, "azul");
+    expect(
+      await screen.findByText(/Edição salva como v2 · Refinando…/),
+    ).toBeInTheDocument();
+    expect(genBodies[genBodies.length - 1].currentCode).toContain("// marca");
+    await user.click(screen.getByRole("button", { name: "Parar" }));
+    await waitFor(() => expect(statusText()).not.toMatch(/Refinando/));
+  });
+
+  it("refine with a draft commits vM then vK, and undo returns to vM", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await v1WithDraft(user);
+
+    await refine(user, "azul");
+    expect(await screen.findByText("Pronto — v3")).toBeInTheDocument();
+    expect(
+      within(list()).getByRole("button", {
+        name: "Restaurar v2: Edição manual. Concluída.",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(list()).getByRole("button", { name: /^v3, versão atual/ }),
+    ).toHaveAttribute("aria-current", "true");
+
+    await user.click(screen.getByRole("button", { name: /Desfazer/ }));
+    expect(await screen.findByText(/Voltou para v2/)).toBeInTheDocument();
+    expect((editor() as HTMLTextAreaElement).value).toContain("// marca");
+  });
+
+  it("Desfazer with a draft on v1 commits it and goes back to v1 (D-07)", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await generateFirst(user);
+    await screen.findByText("Pronto — v1");
+    expect(screen.getByRole("button", { name: /Desfazer/ })).toBeDisabled();
+
+    await typeAtEnd(user, MARK);
+    const undo = screen.getByRole("button", { name: /Desfazer/ });
+    expect(undo).toBeEnabled();
+    await user.click(undo);
+
+    expect(
+      await screen.findByText("Edição salva como v2 · Voltou para v1"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("v1 · 2 versões")).toBeInTheDocument();
+    expect(editor()).toHaveValue(V1);
+    expect(screen.queryByText("Editado", { exact: true })).toBeNull();
+    expect(within(list()).queryByText("Edição manual (rascunho)")).toBeNull();
+    expect(screen.getByRole("button", { name: /Desfazer/ })).toBeDisabled();
+  });
+
+  it("a second Desfazer never creates a duplicate manual version", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await twoVersions(user);
+    await typeAtEnd(user, MARK);
+
+    await user.click(screen.getByRole("button", { name: /Desfazer/ }));
+    expect(
+      await screen.findByText("Edição salva como v3 · Voltou para v2"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("v2 · 3 versões")).toBeInTheDocument();
+    expect(screen.queryByText("Editado", { exact: true })).toBeNull();
+    expect(within(list()).queryByText("Edição manual (rascunho)")).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: /Desfazer/ }));
+    expect(await screen.findByText("Voltou para v1")).toBeInTheDocument();
+    expect(screen.getByText("v1 · 3 versões")).toBeInTheDocument();
+    expect(manualItems()).toHaveLength(1);
+  });
+
+  it("editor Ctrl+Z after commit-then-undo does not bring the draft back", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await v1WithDraft(user);
+
+    await user.click(screen.getByRole("button", { name: /Desfazer/ }));
+    await screen.findByText("Edição salva como v2 · Voltou para v1");
+    const el = editor();
+    el.focus();
+    fireEvent.keyDown(el, { key: "z", keyCode: 90, ctrlKey: true });
+    expect(editor()).toHaveValue(V1);
+    expect(screen.queryByText("Editado", { exact: true })).toBeNull();
+  });
+
+  it("Ctrl+Z outside fields with a draft commits then undoes (D-07)", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await v1WithDraft(user);
+
+    editor().blur();
+    document.body.focus();
+    await user.keyboard("{Control>}z{/Control}");
+    expect(
+      await screen.findByText("Edição salva como v2 · Voltou para v1"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("v1 · 2 versões")).toBeInTheDocument();
+    expect(editor()).toHaveValue(V1);
+    expect(screen.queryByText("Editado", { exact: true })).toBeNull();
+  });
+
+  it("restoring an earlier version with a draft commits it first (D-07)", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await twoVersions(user);
+    await typeAtEnd(user, MARK);
+
+    await user.click(
+      within(list()).getByRole("button", {
+        name: "Restaurar v1: um card. Concluída.",
+      }),
+    );
+    expect(
+      await screen.findByText("Edição salva como v3 · Voltou para v1"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("v1 · 3 versões")).toBeInTheDocument();
+    expect(
+      within(list()).getByRole("button", {
+        name: "Restaurar v3: Edição manual. Concluída. Será descartada ao refinar.",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("clicking the current item with a draft commits it and stays on the base", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await v1WithDraft(user);
+
+    await user.click(
+      within(list()).getByRole("button", {
+        name: "v1, versão atual: um card. Concluída.",
+      }),
+    );
+    expect(await screen.findByText(/Voltou para v1/)).toBeInTheDocument();
+    expect(screen.getByText("v1 · 2 versões")).toBeInTheDocument();
+    expect(screen.queryByText("Editado", { exact: true })).toBeNull();
+    expect(within(list()).queryByText("Edição manual (rascunho)")).toBeNull();
+  });
+
+  it("refining a draft on a restored version drops the later versions (D-08)", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await restoreV1WithDraft(user);
+
+    await refine(user, "verde");
+    expect(await screen.findByText("Pronto — v3")).toBeInTheDocument();
+    expect(screen.getByText("v3 · 3 versões")).toBeInTheDocument();
+    const labels = within(list())
+      .getAllByRole("button")
+      .map((b) => b.getAttribute("aria-label"));
+    expect(labels).toEqual([
+      "Restaurar v1: um card. Concluída.",
+      "Restaurar v2: Edição manual. Concluída.",
+      "v3, versão atual: verde. Concluída.",
+    ]);
+  });
+
+  it("going to a later version with a draft asks first (D-09)", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await restoreV1WithDraft(user);
+
+    const v2Name = "Restaurar v2: azul. Concluída. Será descartada ao refinar.";
+    await user.click(within(list()).getByRole("button", { name: v2Name }));
+    let dialog = await screen.findByRole("alertdialog");
+    expect(within(dialog).getByText("Descartar edições?")).toBeInTheDocument();
+    expect(
+      within(dialog).getByText(
+        "Você tem edições na v1. Ir para a v2 descarta essas edições.",
+      ),
+    ).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(screen.getByText("Editado", { exact: true })).toBeInTheDocument();
+    expect(screen.getByText("v1 · 2 versões")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        within(list()).getByRole("button", { name: v2Name }),
+      ).toHaveFocus(),
+    );
+
+    await user.click(within(list()).getByRole("button", { name: v2Name }));
+    dialog = await screen.findByRole("alertdialog");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Descartar edições e ir" }),
+    );
+    expect(await screen.findByText("Foi para v2")).toBeInTheDocument();
+    expect(screen.getByText("v2 · 2 versões")).toBeInTheDocument();
+    expect(screen.queryByText("Editado", { exact: true })).toBeNull();
+    expect(editor()).toHaveValue(V2);
+  });
+
+  it("Escape on the D-09 dialog keeps the draft", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await restoreV1WithDraft(user);
+
+    await user.click(
+      within(list()).getByRole("button", { name: /^Restaurar v2/ }),
+    );
+    await screen.findByRole("alertdialog");
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(screen.getByText("Editado", { exact: true })).toBeInTheDocument();
+    expect(editor()).toHaveValue(V1 + MARK);
+  });
+
+  it("Novo componente with one version and a draft asks first (D-07)", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await v1WithDraft(user);
+
+    await user.click(screen.getByRole("button", { name: /Novo componente/ }));
+    const dialog = await screen.findByRole("alertdialog");
+    expect(
+      within(dialog).getByText("Começar um novo componente?"),
+    ).toBeInTheDocument();
+    await user.click(
+      within(dialog).getByRole("button", { name: "Descartar e começar" }),
+    );
+    expect(
+      await screen.findByText("Novo componente iniciado"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("textbox", { name: "Editor de código" }),
+    ).toBeNull();
+    expect(screen.queryByText("Edição manual (rascunho)")).toBeNull();
+  });
+
+  it("refining a broken draft saves it as-is (D-10)", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await generateFirst(user);
+    await screen.findByText("Pronto — v1");
+
+    fireEvent.change(editor(), { target: { value: "const x = 1" } });
+    expect(screen.getByText("Editado", { exact: true })).toBeInTheDocument();
+    await refine(user, "azul");
+    expect(await screen.findByText("Pronto — v3")).toBeInTheDocument();
+    expect(genBodies[genBodies.length - 1].currentCode).toBe("const x = 1");
+    expect(
+      within(list()).getByRole("button", {
+        name: "Restaurar v2: Edição manual. Concluída.",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("an oversized draft is saved and rejected without a request (D-10)", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await generateFirst(user);
+    await screen.findByText("Pronto — v1");
+    const before = genBodies.length;
+
+    fireEvent.change(editor(), {
+      target: { value: "x".repeat(MAX_CODE_LENGTH + 1) },
+    });
+    await refine(user, "azul");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      CODE_TOO_LARGE_MESSAGE,
+    );
+    expect(genBodies.length).toBe(before);
+    expect(manualItems()).toHaveLength(1);
+    expect(statusText()).toBe("Edição salva como v2");
+    // Highlighting a MAX_CODE_LENGTH-sized draft is slow in jsdom.
+  }, 30_000);
+
+  it("retry on the error banner commits the draft and reuses the instruction", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await generateFirst(user);
+    await screen.findByText("Pronto — v1");
+
+    behaviors.push("error");
+    await refine(user, "azul");
+    await screen.findByRole("alert");
+    await typeAtEnd(user, MARK);
+
+    await user.click(screen.getByRole("button", { name: /^Tentar de novo$/ }));
+    expect(await screen.findByText("Pronto — v3")).toBeInTheDocument();
+    const last = genBodies[genBodies.length - 1];
+    expect(last.prompt).toBe("azul");
+    expect(last.currentCode).toContain("// marca");
+    expect(manualItems()).toHaveLength(1);
+  });
+
+  it("an empty prompt with a draft creates no manual version", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await v1WithDraft(user);
+
+    await user.click(screen.getByRole("button", { name: "Refinar" }));
+    expect(screen.getByText("Editado", { exact: true })).toBeInTheDocument();
+    expect(screen.getByText("v1 · 1 versão")).toBeInTheDocument();
+    expect(genBodies).toHaveLength(1);
   });
 });
