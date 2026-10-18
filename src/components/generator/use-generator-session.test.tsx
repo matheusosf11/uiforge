@@ -431,3 +431,258 @@ describe("useGeneratorSession", () => {
     expect(result.current.state.cursor).toBe(1);
   });
 });
+
+const DRAFT = "export default function Edited() { return <div>e</div>; }";
+const CODE3 = "export default function C() { return <div>c</div>; }";
+
+function hangResponse(init: RequestInit): Response {
+  const enc = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    start(c) {
+      c.enqueue(enc.encode("export def"));
+      init.signal?.addEventListener("abort", () =>
+        c.error(new DOMException("aborted", "AbortError")),
+      );
+    },
+  });
+  return new Response(stream, { status: 200 });
+}
+
+function setup(f: ReturnType<typeof vi.fn>) {
+  return renderHook(() =>
+    useGeneratorSession({ fetchImpl: f as unknown as typeof fetch }),
+  );
+}
+
+describe("manual drafts", () => {
+  it("send with a draft commits a manual version first and refines from it", async () => {
+    const f = vi
+      .fn()
+      .mockImplementationOnce(async () => streamResponse([CODE]))
+      .mockImplementationOnce(async () => streamResponse([CODE3]));
+    const { result } = setup(f);
+    await act(async () => {
+      await result.current.send("um");
+    });
+    let r = "";
+    await act(async () => {
+      r = await result.current.send("azul", DRAFT);
+    });
+    expect(r).toBe("committed");
+    expect(bodyOf(f, 1)).toEqual({ prompt: "azul", currentCode: DRAFT });
+    const vs = result.current.state.versions;
+    expect(vs.map((v) => [v.code, v.instruction, v.source])).toEqual([
+      [CODE, "um", "ai"],
+      [DRAFT, "", "manual"],
+      [CODE3, "azul", "ai"],
+    ]);
+    act(() => result.current.undo());
+    expect(result.current.committed?.code).toBe(DRAFT);
+    expect(result.current.committed?.source).toBe("manual");
+  });
+
+  it("a blank send with a draft is ignored and commits nothing", async () => {
+    const f = okFetch(CODE);
+    const { result } = setup(f);
+    await act(async () => {
+      await result.current.send("um");
+    });
+    let r = "";
+    await act(async () => {
+      r = await result.current.send("   ", DRAFT);
+    });
+    expect(r).toBe("ignored");
+    expect(f).toHaveBeenCalledTimes(1);
+    expect(result.current.state.versions).toHaveLength(1);
+  });
+
+  it("a busy send with a draft is ignored and commits nothing", async () => {
+    const f = vi
+      .fn()
+      .mockImplementationOnce(async () => streamResponse([CODE]))
+      .mockImplementationOnce(async (_u: string, init: RequestInit) =>
+        hangResponse(init),
+      );
+    const { result } = setup(f);
+    await act(async () => {
+      await result.current.send("um");
+    });
+    let pending: Promise<string>;
+    act(() => {
+      pending = result.current.send("dois");
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(result.current.busy).toBe(true);
+    let r = "";
+    await act(async () => {
+      r = await result.current.send("azul", DRAFT);
+    });
+    expect(r).toBe("ignored");
+    expect(result.current.state.versions).toHaveLength(1);
+    act(() => result.current.stop());
+    await act(async () => {
+      await pending!;
+    });
+    expect(result.current.state.versions).toHaveLength(1);
+  });
+
+  it("a draft equal to the committed code adds no manual version", async () => {
+    const f = vi
+      .fn()
+      .mockImplementationOnce(async () => streamResponse([CODE]))
+      .mockImplementationOnce(async () => streamResponse([CODE2]));
+    const { result } = setup(f);
+    await act(async () => {
+      await result.current.send("um");
+    });
+    await act(async () => {
+      await result.current.send("azul", CODE);
+    });
+    expect(bodyOf(f, 1)).toEqual({ prompt: "azul", currentCode: CODE });
+    expect(result.current.state.versions.map((v) => v.source)).toEqual([
+      "ai",
+      "ai",
+    ]);
+  });
+
+  it("an oversized draft is kept as a manual version and rejected as too_large", async () => {
+    const f = okFetch(CODE);
+    const { result } = setup(f);
+    await act(async () => {
+      await result.current.send("um");
+    });
+    let r = "";
+    await act(async () => {
+      r = await result.current.send("azul", "x".repeat(MAX_CODE_LENGTH + 1));
+    });
+    expect(r).toBe("failed");
+    expect(f).toHaveBeenCalledTimes(1);
+    expect(result.current.state.versions).toHaveLength(2);
+    expect(result.current.committed?.source).toBe("manual");
+    expect(result.current.state.error?.kind).toBe("too_large");
+    expect(result.current.state.notice).toBe("manual");
+  });
+
+  it("undo with a draft commits it then moves back to the base", async () => {
+    const f = okFetch(CODE);
+    const { result } = setup(f);
+    await act(async () => {
+      await result.current.send("um");
+    });
+    act(() => result.current.undo(DRAFT));
+    const s = result.current.state;
+    expect(s.versions).toHaveLength(2);
+    expect(s.versions[1].source).toBe("manual");
+    expect(s.cursor).toBe(0);
+    expect(s.notice).toBe("undo");
+    expect(s.savedManualId).toBe(s.versions[1].id);
+  });
+
+  it("restore with a draft commits it after the current version, then restores", async () => {
+    const f = vi
+      .fn()
+      .mockImplementationOnce(async () => streamResponse([CODE]))
+      .mockImplementationOnce(async () => streamResponse([CODE2]));
+    const { result } = setup(f);
+    await act(async () => {
+      await result.current.send("um");
+    });
+    await act(async () => {
+      await result.current.send("dois");
+    });
+    const v1 = result.current.state.versions[0].id;
+    act(() => result.current.restore(v1, DRAFT));
+    const s = result.current.state;
+    expect(s.versions.map((v) => v.code)).toEqual([CODE, CODE2, DRAFT]);
+    expect(s.versions[2].source).toBe("manual");
+    expect(s.cursor).toBe(0);
+  });
+
+  it("restore of the current version with a draft commits it and returns to the base", async () => {
+    const f = okFetch(CODE);
+    const { result } = setup(f);
+    await act(async () => {
+      await result.current.send("um");
+    });
+    const v1 = result.current.state.versions[0].id;
+    act(() => result.current.restore(v1, DRAFT));
+    const s = result.current.state;
+    expect(s.versions).toHaveLength(2);
+    expect(s.versions[1].source).toBe("manual");
+    expect(s.cursor).toBe(0);
+  });
+
+  it("retry with a draft commits it and re-sends the failed instruction from it", async () => {
+    const f = vi
+      .fn()
+      .mockImplementationOnce(async () => streamResponse([CODE]))
+      .mockImplementationOnce(async () => new Response("x", { status: 500 }))
+      .mockImplementationOnce(async () => streamResponse([CODE3]));
+    const { result } = setup(f);
+    await act(async () => {
+      await result.current.send("um");
+    });
+    await act(async () => {
+      await result.current.send("dois");
+    });
+    expect(result.current.state.error?.kind).toBe("failed");
+    let r = "";
+    await act(async () => {
+      r = await result.current.retry(DRAFT);
+    });
+    expect(r).toBe("committed");
+    expect(bodyOf(f, 2)).toEqual({ prompt: "dois", currentCode: DRAFT });
+    const vs = result.current.state.versions;
+    expect(vs.map((v) => v.source)).toEqual(["ai", "manual", "ai"]);
+    expect(vs[1].code).toBe(DRAFT);
+    expect(vs[2].code).toBe(CODE3);
+  });
+
+  it("non-string drafts (e.g. a click event) never commit a manual version", async () => {
+    const f = vi
+      .fn()
+      .mockImplementationOnce(async () => streamResponse([CODE]))
+      .mockImplementationOnce(async () => streamResponse([CODE2]));
+    const { result } = setup(f);
+    await act(async () => {
+      await result.current.send("um");
+    });
+    await act(async () => {
+      await result.current.send("dois");
+    });
+    act(() => result.current.undo({ type: "click" } as unknown as string));
+    expect(result.current.state.versions).toHaveLength(2);
+    expect(result.current.state.cursor).toBe(0);
+    act(() =>
+      result.current.restore(result.current.state.versions[1].id, undefined),
+    );
+    expect(result.current.state.versions).toHaveLength(2);
+    expect(
+      result.current.state.versions.every((v) => v.source === "ai"),
+    ).toBe(true);
+  });
+
+  it("regenerate is ignored on a manual version", async () => {
+    const f = vi
+      .fn()
+      .mockImplementationOnce(async () => streamResponse([CODE]))
+      .mockImplementationOnce(async () => new Response("x", { status: 500 }));
+    const { result } = setup(f);
+    await act(async () => {
+      await result.current.send("um");
+    });
+    await act(async () => {
+      await result.current.send("dois", DRAFT);
+    });
+    expect(result.current.committed?.source).toBe("manual");
+    expect(result.current.canRegenerate).toBe(false);
+    let r = "";
+    await act(async () => {
+      r = await result.current.regenerate();
+    });
+    expect(r).toBe("ignored");
+    expect(f).toHaveBeenCalledTimes(2);
+  });
+});
