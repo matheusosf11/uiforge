@@ -386,3 +386,187 @@ describe("COMMIT with a removed base (IN-01)", () => {
     expect(c.notice).toBeNull();
   });
 });
+
+const DRAFT = "export default function Edited() { return 1; }";
+
+function many(n: number) {
+  let s = initialSessionState;
+  for (let i = 1; i <= n; i++) s = commit(s, i, code(i));
+  return s;
+}
+
+describe("COMMIT_MANUAL", () => {
+  it("appends a manual version after v1 and moves the cursor to it", () => {
+    const base = commit(initialSessionState, 1, code(1));
+    const s = sessionReducer(base, { type: "COMMIT_MANUAL", code: DRAFT });
+    expect(s.versions).toHaveLength(2);
+    expect(s.versions[1]).toEqual({
+      id: base.nextVersionId,
+      code: DRAFT,
+      instruction: "",
+      source: "manual",
+    });
+    expect(s.cursor).toBe(1);
+    expect(s.notice).toBe("manual");
+    expect(s.savedManualId).toBe(base.nextVersionId);
+    expect(s.nextVersionId).toBe(base.nextVersionId + 1);
+    expect(s.error).toBeNull();
+    expect(s.pending).toBeNull();
+  });
+
+  it("is a no-op when the code equals the committed code (D-06)", () => {
+    const base = commit(initialSessionState, 1, code(1));
+    expect(sessionReducer(base, { type: "COMMIT_MANUAL", code: code(1) })).toBe(base);
+  });
+
+  it("is a no-op on the empty session", () => {
+    expect(
+      sessionReducer(initialSessionState, { type: "COMMIT_MANUAL", code: DRAFT }),
+    ).toBe(initialSessionState);
+  });
+
+  it("is a no-op while pending (D-05)", () => {
+    const p = sessionReducer(commit(initialSessionState, 1, code(1)), {
+      type: "START",
+      id: 2,
+      instruction: "a",
+    });
+    expect(sessionReducer(p, { type: "COMMIT_MANUAL", code: DRAFT })).toBe(p);
+  });
+
+  it("saves code without export default as-is (D-10)", () => {
+    const base = commit(initialSessionState, 1, code(1));
+    const s = sessionReducer(base, { type: "COMMIT_MANUAL", code: "const x = 1" });
+    expect(committedVersion(s)?.code).toBe("const x = 1");
+    expect(committedVersion(s)?.source).toBe("manual");
+  });
+
+  it("drops later versions after a RESTORE to v1 (D-08)", () => {
+    const s = three();
+    const r = sessionReducer(s, { type: "RESTORE", versionId: s.versions[0].id });
+    const m = sessionReducer(r, { type: "COMMIT_MANUAL", code: DRAFT });
+    expect(m.versions).toHaveLength(2);
+    expect(m.versions[0].id).toBe(s.versions[0].id);
+    expect(m.versions[1].source).toBe("manual");
+    expect(m.cursor).toBe(1);
+  });
+
+  it("applies the MAX_VERSIONS cap with droppedCount", () => {
+    const s = many(MAX_VERSIONS);
+    expect(s.droppedCount).toBe(0);
+    const m = sessionReducer(s, { type: "COMMIT_MANUAL", code: DRAFT });
+    expect(m.versions).toHaveLength(MAX_VERSIONS);
+    expect(m.droppedCount).toBe(1);
+    expect(m.cursor).toBe(MAX_VERSIONS - 1);
+    expect(m.versions[MAX_VERSIONS - 1].source).toBe("manual");
+  });
+
+  it("RESTORE of an evicted id after a capped COMMIT_MANUAL is a no-op (P7)", () => {
+    const s = many(MAX_VERSIONS);
+    const oldest = s.versions[0].id;
+    const m = sessionReducer(s, { type: "COMMIT_MANUAL", code: DRAFT });
+    const r = sessionReducer(m, { type: "RESTORE", versionId: oldest });
+    expect(r).toBe(m);
+    expect(r.cursor).toBe(MAX_VERSIONS - 1);
+    expect(r.notice).toBe("manual");
+  });
+});
+
+describe("savedManualId", () => {
+  const manualAtV2 = () =>
+    sessionReducer(commit(initialSessionState, 1, code(1)), {
+      type: "COMMIT_MANUAL",
+      code: DRAFT,
+    });
+
+  it("is null initially", () => {
+    expect(initialSessionState.savedManualId).toBeNull();
+  });
+
+  it("survives one UNDO, cleared by the next", () => {
+    const m = manualAtV2();
+    const u = sessionReducer(m, { type: "UNDO" });
+    expect(u.notice).toBe("undo");
+    expect(u.cursor).toBe(0);
+    expect(u.savedManualId).toBe(m.savedManualId);
+    // Re-commit manual to have something to undo twice.
+    const m2 = sessionReducer(
+      sessionReducer(m, { type: "COMMIT_MANUAL", code: DRAFT + " " }),
+      { type: "UNDO" },
+    );
+    expect(m2.savedManualId).not.toBeNull();
+    const u2 = sessionReducer(m2, { type: "UNDO" });
+    expect(u2.notice).toBe("undo");
+    expect(u2.savedManualId).toBeNull();
+  });
+
+  it("survives RESTORE to the base", () => {
+    const m = manualAtV2();
+    const r = sessionReducer(m, { type: "RESTORE", versionId: m.versions[0].id });
+    expect(r.notice).toBe("undo");
+    expect(r.savedManualId).toBe(m.savedManualId);
+  });
+
+  it("survives START and CHUNK, cleared by COMMIT", () => {
+    const m = manualAtV2();
+    const st = sessionReducer(m, { type: "START", id: 7, instruction: "a" });
+    expect(st.pending).not.toBeNull();
+    expect(st.notice).toBeNull();
+    expect(st.savedManualId).toBe(m.savedManualId);
+    const ch = sessionReducer(st, { type: "CHUNK", id: 7, text: "exp" });
+    expect(ch.savedManualId).toBe(m.savedManualId);
+    const c = sessionReducer(ch, { type: "COMMIT", id: 7, raw: code(7) });
+    expect(c.savedManualId).toBeNull();
+    expect(c.notice).toBe("committed");
+  });
+
+  it("REJECT keeps the manual notice and id", () => {
+    const m = manualAtV2();
+    const r = sessionReducer(m, { type: "REJECT", kind: "too_large", instruction: "big" });
+    expect(r.error?.kind).toBe("too_large");
+    expect(r.notice).toBe("manual");
+    expect(r.savedManualId).toBe(m.savedManualId);
+  });
+
+  it("REJECT without a prior manual notice clears both", () => {
+    const base = commit(initialSessionState, 1, code(1));
+    const r = sessionReducer(base, { type: "REJECT", kind: "too_large", instruction: "big" });
+    expect(r.notice).toBeNull();
+    expect(r.savedManualId).toBeNull();
+  });
+
+  it("FAIL, ABORT and RESET clear it", () => {
+    const m = manualAtV2();
+    const f = run(
+      [
+        { type: "START", id: 3, instruction: "a" },
+        { type: "FAIL", id: 3, kind: "failed" },
+      ],
+      m,
+    );
+    expect(f.savedManualId).toBeNull();
+    const a = run(
+      [
+        { type: "START", id: 4, instruction: "a" },
+        { type: "ABORT", id: 4 },
+      ],
+      m,
+    );
+    expect(a.savedManualId).toBeNull();
+    expect(sessionReducer(m, { type: "RESET" }).savedManualId).toBeNull();
+  });
+});
+
+describe("canRegenerate with manual versions (D-12)", () => {
+  it("is false on a manual version, true again after a later ai COMMIT", () => {
+    const m = sessionReducer(commit(initialSessionState, 1, code(1)), {
+      type: "COMMIT_MANUAL",
+      code: DRAFT,
+    });
+    expect(m.cursor).toBe(1);
+    expect(canRegenerate(m)).toBe(false);
+    const c = commit(m, 9, code(9));
+    expect(c.cursor).toBe(c.versions.length - 1);
+    expect(canRegenerate(c)).toBe(true);
+  });
+});
