@@ -2,7 +2,7 @@
 import { MODEL_IDS, getModels, isE2EMock } from "./model";
 import {
   FIXED_COMPONENT,
-  IMAGE_COMPONENT,
+  imageComponent,
   REFINED_COMPONENT,
   createE2EMockModel,
 } from "./mock-model";
@@ -129,22 +129,22 @@ describe("mock model refine mode", () => {
     expect(types).not.toContain("finish");
   });
 
-  it("streams IMAGE_COMPONENT when the request carries an image", async () => {
+  it("streams one <img> per attached image", async () => {
+    const img = { type: "file", mediaType: "image/png", data: { type: "data", data: "AA" } };
     const messages = [
       {
         role: "user",
-        content: [
-          { type: "text", text: "p" },
-          { type: "file", mediaType: "image/png", data: { type: "data", data: "AA" } },
-        ],
+        content: [{ type: "text", text: "p" }, img, { type: "text", text: "Image 2:" }, img],
       },
     ];
     const text = (await consume("p", undefined, messages))
       .filter((p) => p.type === "text-delta")
       .map((p) => p.delta)
       .join("");
-    expect(text).toBe(IMAGE_COMPONENT);
-    expect(text).toContain('src="uiforge:image"');
+    expect(text).toBe(imageComponent(2));
+    expect(text).toContain('src="uiforge:image-1"');
+    expect(text).toContain('src="uiforge:image-2"');
+    expect(text).not.toContain("uiforge:image-3");
   });
 
   it("generate output is unchanged without currentCode", async () => {

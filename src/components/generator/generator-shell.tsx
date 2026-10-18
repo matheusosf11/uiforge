@@ -26,9 +26,10 @@ import {
 import { parseCode } from "@/lib/parse-code";
 import {
   imageDataUrl,
+  MAX_IMAGES,
   prepareImage,
   PromptImageError,
-  withPreviewImage,
+  withPreviewImages,
   type PromptImage,
 } from "@/lib/prompt-image";
 import {
@@ -85,13 +86,13 @@ export function GeneratorShell() {
     code: null,
   });
   const [prompt, setPrompt] = useState("");
-  // Reference image attached to the next send; cleared when it commits.
-  const [image, setImage] = useState<PromptImage | null>(null);
+  // Reference images attached to the next send; cleared when it commits.
+  const [images, setImages] = useState<PromptImage[]>([]);
   const [imageError, setImageError] = useState<string | null>(null);
   const [imageBusy, setImageBusy] = useState(false);
-  // Last image sent in this session: the preview shows it wherever the code
-  // uses the image token. "Novo componente" forgets it.
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  // Images of the last send in this session: the preview shows image N
+  // wherever the code uses its token. "Novo componente" forgets them.
+  const [previewImages, setPreviewImages] = useState<string[]>([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
   // D-02: mobile history disclosure; only "Novo componente" collapses it.
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -154,11 +155,11 @@ export function GeneratorShell() {
   // D-11: the preview follows the draft 500 ms after the last keystroke;
   // null (discard, commit, restore, reset) passes through immediately.
   const debounced = useDebouncedDraft(dirty ? draft : null, 500);
-  const previewCode = withPreviewImage(
+  const previewCode = withPreviewImages(
     dirty && debounced && committed && debounced.baseId === committed.id
       ? debounced.code
       : (committed?.code ?? ""),
-    previewImage,
+    previewImages,
   );
 
   function handleEditorChange(next: string) {
@@ -239,41 +240,55 @@ export function GeneratorShell() {
         error.baseId !== null ? REFINE_ERROR_MESSAGE : GENERIC_ERROR_MESSAGE;
   }
 
-  async function handleAttachImage(file: File) {
+  // Shrinks the picked files one by one, up to the free slots; the first
+  // refusal (wrong type, too many) is shown and the rest still attach.
+  async function handleAttachImages(files: File[]) {
     setImageError(null);
-    setImageBusy(true);
-    try {
-      setImage(await prepareImage(file));
-    } catch (err) {
-      setImageError(
-        err instanceof PromptImageError
-          ? err.message
-          : "Não foi possível usar essa imagem.",
-      );
-    } finally {
-      setImageBusy(false);
+    const free = MAX_IMAGES - images.length;
+    if (free <= 0) {
+      setImageError(`Você pode anexar no máximo ${MAX_IMAGES} imagens.`);
+      return;
     }
+    setImageBusy(true);
+    let error: string | null =
+      files.length > free
+        ? `Você pode anexar no máximo ${MAX_IMAGES} imagens; as extras foram ignoradas.`
+        : null;
+    const added: PromptImage[] = [];
+    for (const file of files.slice(0, free)) {
+      try {
+        added.push(await prepareImage(file));
+      } catch (err) {
+        error ??=
+          err instanceof PromptImageError
+            ? err.message
+            : "Não foi possível usar essa imagem.";
+      }
+    }
+    setImages((current) => [...current, ...added].slice(0, MAX_IMAGES));
+    setImageError(error);
+    setImageBusy(false);
   }
 
-  function removeImage() {
-    setImage(null);
+  function removeImage(index: number) {
+    setImages((current) => current.filter((_, i) => i !== index));
     setImageError(null);
   }
 
-  // Sends with the attached image. The preview switches to it as soon as the
-  // request starts (the new code streams in), and goes back to the previous
-  // one when nothing was committed.
-  async function sendWithImage(
-    request: (img: PromptImage | null) => Promise<string>,
+  // Sends with the attached images. The preview switches to them as soon as
+  // the request starts (the new code streams in), and goes back to the
+  // previous ones when nothing was committed.
+  async function sendWithImages(
+    request: (imgs: PromptImage[]) => Promise<string>,
   ) {
-    const sent = image;
-    const before = previewImage;
-    if (sent) setPreviewImage(imageDataUrl(sent));
+    const sent = images;
+    const before = previewImages;
+    if (sent.length > 0) setPreviewImages(sent.map(imageDataUrl));
     const outcome = await request(sent);
     if (outcome === "committed") {
-      if (sent) setImage((i) => (i === sent ? null : i));
-    } else if (sent) {
-      setPreviewImage(before);
+      if (sent.length > 0) setImages((i) => (i === sent ? [] : i));
+    } else if (sent.length > 0) {
+      setPreviewImages(before);
     }
     return outcome;
   }
@@ -281,8 +296,8 @@ export function GeneratorShell() {
   async function handleSubmit() {
     // D-07/D-10: the draft (broken or oversized, as-is) is committed as a
     // manual version only when the refine actually starts.
-    const outcome = await sendWithImage((img) =>
-      session.send(prompt.trim(), draftCode, img),
+    const outcome = await sendWithImages((imgs) =>
+      session.send(prompt.trim(), draftCode, imgs),
     );
     // D-02: clear only when a version was committed.
     if (outcome === "committed") setPrompt("");
@@ -290,7 +305,9 @@ export function GeneratorShell() {
 
   async function handleRetry() {
     const instruction = error?.instruction ?? "";
-    const outcome = await sendWithImage((img) => session.retry(draftCode, img));
+    const outcome = await sendWithImages((imgs) =>
+      session.retry(draftCode, imgs),
+    );
     // D-02: a committed retry clears the field like a submit, unless the user
     // already edited it into a different draft meanwhile.
     if (outcome === "committed") {
@@ -339,8 +356,8 @@ export function GeneratorShell() {
     setDraft(null);
     suggestions.reset();
     setHistoryOpen(false);
-    setPreviewImage(null);
-    // D-13: prompt text (and an attached image) is intentionally preserved.
+    setPreviewImages([]);
+    // D-13: prompt text (and attached images) is intentionally preserved.
   }
 
   function requestNew() {
@@ -388,8 +405,8 @@ export function GeneratorShell() {
       mode={refineMode ? "refine" : "generate"}
       chips={refineMode ? chips : null}
       textareaRef={textareaRef}
-      image={image ? { name: image.name, src: imageDataUrl(image) } : null}
-      onAttachImage={(file) => void handleAttachImage(file)}
+      images={images.map((img) => ({ name: img.name, src: imageDataUrl(img) }))}
+      onAttachImages={(files) => void handleAttachImages(files)}
       onRemoveImage={removeImage}
       imageError={imageError}
       imageBusy={imageBusy}

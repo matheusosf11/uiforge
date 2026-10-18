@@ -15,7 +15,7 @@ function isAbortError(err: unknown): boolean {
 }
 
 export async function streamGenerate(
-  body: { prompt: string; currentCode?: string; image?: PromptImage },
+  body: { prompt: string; currentCode?: string; images?: readonly PromptImage[] },
   opts: {
     signal: AbortSignal;
     onText: (fullText: string) => void;
@@ -26,14 +26,17 @@ export async function streamGenerate(
   const payload: {
     prompt: string;
     currentCode?: string;
-    image?: { mediaType: string; data: string };
+    images?: { mediaType: string; data: string }[];
   } = {
     prompt: body.prompt,
   };
   if (body.currentCode !== undefined) payload.currentCode = body.currentCode;
   // The file name stays in the browser.
-  if (body.image) {
-    payload.image = { mediaType: body.image.mediaType, data: body.image.data };
+  if (body.images && body.images.length > 0) {
+    payload.images = body.images.map((i) => ({
+      mediaType: i.mediaType,
+      data: i.data,
+    }));
   }
 
   try {

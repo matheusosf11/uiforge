@@ -1,25 +1,36 @@
 import { describe, expect, it } from "vitest";
 import {
   IMAGE_TOKEN,
+  imageToken,
   imageDataUrl,
   isImageMediaType,
   prepareImage,
   PromptImageError,
-  withPreviewImage,
+  withPreviewImages,
 } from "@/lib/prompt-image";
 
-describe("withPreviewImage", () => {
-  const code = `<img src="${IMAGE_TOKEN}" /><img src="${IMAGE_TOKEN}" />`;
+describe("withPreviewImages", () => {
+  const A = "data:image/jpeg;base64,AA";
+  const B = "data:image/jpeg;base64,BB";
 
-  it("points every token at the image", () => {
-    expect(withPreviewImage(code, "data:image/jpeg;base64,AA")).toBe(
-      '<img src="data:image/jpeg;base64,AA" /><img src="data:image/jpeg;base64,AA" />',
+  it("points each numbered token at its image", () => {
+    const code = `<img src="${imageToken(2)}" /><img src="${imageToken(1)}" /><img src="${imageToken(2)}" />`;
+    expect(withPreviewImages(code, [A, B])).toBe(
+      `<img src="${B}" /><img src="${A}" /><img src="${B}" />`,
     );
   });
 
-  it("leaves the code alone without an image or a token", () => {
-    expect(withPreviewImage(code, null)).toBe(code);
-    expect(withPreviewImage("<div />", "data:x")).toBe("<div />");
+  it("treats the bare token from the first version as image 1", () => {
+    expect(withPreviewImages(`<img src="${IMAGE_TOKEN}" />`, [A, B])).toBe(
+      `<img src="${A}" />`,
+    );
+  });
+
+  it("leaves tokens without an image, and code without images, alone", () => {
+    const code = `<img src="${imageToken(3)}" />`;
+    expect(withPreviewImages(code, [A])).toBe(code);
+    expect(withPreviewImages(code, [])).toBe(code);
+    expect(withPreviewImages("<div />", [A])).toBe("<div />");
   });
 });
 

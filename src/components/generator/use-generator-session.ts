@@ -32,12 +32,12 @@ export function useGeneratorSession(opts?: { fetchImpl?: typeof fetch }) {
   fetchImplRef.current = opts?.fetchImpl;
 
   // `base` null = fresh generation ({ prompt } only, no currentCode).
-  // `image` is an optional visual reference sent along with this request.
+  // `images` are optional visual references sent along with this request.
   const run = useCallback(
     async (
       text: string,
       base: Version | null,
-      image?: PromptImage | null,
+      images?: readonly PromptImage[],
     ): Promise<SendResult> => {
       const instruction = text.trim();
       if (!instruction) return "ignored";
@@ -61,7 +61,7 @@ export function useGeneratorSession(opts?: { fetchImpl?: typeof fetch }) {
           {
             prompt: instruction,
             ...(base ? { currentCode: base.code } : {}),
-            ...(image ? { image } : {}),
+            ...(images && images.length > 0 ? { images } : {}),
           },
           {
             signal: ac.signal,
@@ -132,7 +132,7 @@ export function useGeneratorSession(opts?: { fetchImpl?: typeof fetch }) {
     (
       text: string,
       draft?: string | null,
-      image?: PromptImage | null,
+      images?: readonly PromptImage[],
     ): Promise<SendResult> => {
       if (
         !text.trim() ||
@@ -142,7 +142,7 @@ export function useGeneratorSession(opts?: { fetchImpl?: typeof fetch }) {
         return Promise.resolve("ignored");
       }
       commitManual(draft);
-      return run(text, committedVersion(stateRef.current), image);
+      return run(text, committedVersion(stateRef.current), images);
     },
     [run, commitManual],
   );
@@ -153,19 +153,19 @@ export function useGeneratorSession(opts?: { fetchImpl?: typeof fetch }) {
   const retry = useCallback(
     async (
       draft?: string | null,
-      image?: PromptImage | null,
+      images?: readonly PromptImage[],
     ): Promise<SendResult> => {
       const s = stateRef.current;
       const error = s.error;
       if (!error || error.kind === "too_large") return "ignored";
       const manual = commitManual(draft);
-      if (manual) return run(error.instruction, manual, image);
+      if (manual) return run(error.instruction, manual, images);
       const base =
         error.baseId === null
           ? null
           : (s.versions.find((v) => v.id === error.baseId) ??
             committedVersion(s));
-      return run(error.instruction, base, image);
+      return run(error.instruction, base, images);
     },
     [run, commitManual],
   );

@@ -425,37 +425,62 @@ describe("POST /api/generate", () => {
     });
   });
 
-  describe("imagem de referencia", () => {
+  describe("imagens de referencia", () => {
     const PNG = "iVBORw0KGgo=";
+    const JPG = "/9j/4AAQSkZJRg==";
     const call = () =>
       vi.mocked(streamText).mock.lastCall?.[0] as unknown as {
         system: string;
         prompt?: string;
         messages?: { role: string; content: Record<string, unknown>[] }[];
       };
+    const file = (mediaType: string, data: string) => ({
+      type: "file",
+      mediaType,
+      data: { type: "data", data },
+    });
 
-    it("envia texto + imagem como mensagem e adiciona as regras de imagem", async () => {
+    it("envia texto + imagens rotuladas e as regras com a contagem", async () => {
       state.parts = [{ type: "text-delta", text: "a" }];
       const res = await POST(
-        req({ prompt: "igual ao print", image: { mediaType: "image/png", data: PNG } }),
+        req({
+          prompt: "layout da 1 com as cores da 2",
+          images: [
+            { mediaType: "image/png", data: PNG },
+            { mediaType: "image/jpeg", data: JPG },
+          ],
+        }),
       );
       expect(res.status).toBe(200);
       await res.text();
       expect(call().prompt).toBeUndefined();
-      expect(call().system).toBe(buildSystem("generate", { image: true }));
-      expect(call().system).toContain("ATTACHED IMAGE");
+      expect(call().system).toBe(buildSystem("generate", { images: 2 }));
+      expect(call().system).toContain("2 images, labelled Image 1 to Image 2");
       expect(call().messages).toEqual([
         {
           role: "user",
           content: [
-            { type: "text", text: "igual ao print" },
-            {
-              type: "file",
-              mediaType: "image/png",
-              data: { type: "data", data: PNG },
-            },
+            { type: "text", text: "layout da 1 com as cores da 2" },
+            { type: "text", text: "Image 1:" },
+            file("image/png", PNG),
+            { type: "text", text: "Image 2:" },
+            file("image/jpeg", JPG),
           ],
         },
+      ]);
+    });
+
+    it("aceita o campo antigo image (uma imagem) como imagem 1", async () => {
+      state.parts = [{ type: "text-delta", text: "a" }];
+      const res = await POST(
+        req({ prompt: "x", image: { mediaType: "image/webp", data: PNG } }),
+      );
+      await res.text();
+      expect(call().system).toBe(buildSystem("generate", { images: 1 }));
+      expect(call().messages?.[0].content).toEqual([
+        { type: "text", text: "x" },
+        { type: "text", text: "Image 1:" },
+        file("image/webp", PNG),
       ]);
     });
 
@@ -465,46 +490,52 @@ describe("POST /api/generate", () => {
         req({
           prompt: "x",
           currentCode: "code",
-          image: { mediaType: "image/jpeg", data: PNG },
+          images: [{ mediaType: "image/jpeg", data: JPG }],
         }),
       );
       await res.text();
-      expect(call().system).toBe(buildSystem("edit", { image: true }));
+      expect(call().system).toBe(buildSystem("edit", { images: 1 }));
       expect(call().messages?.[0].content[0].text).toContain("<current_code>");
     });
 
-    it("sem imagem (null) segue o caminho de prompt de texto", async () => {
+    it.each([[null], [[]]])("images %j segue o caminho de prompt de texto", async (images) => {
       state.parts = [{ type: "text-delta", text: "a" }];
-      const res = await POST(req({ prompt: "x", image: null }));
+      const res = await POST(req({ prompt: "x", images }));
       await res.text();
       expect(call().prompt).toBe("x");
       expect(call().messages).toBeUndefined();
+      expect(call().system).toBe(SYSTEM_PROMPT);
     });
 
+    const ok = { mediaType: "image/png", data: PNG };
     it.each([
-      [{ mediaType: "image/gif", data: PNG }],
-      [{ mediaType: "image/svg+xml", data: PNG }],
-      [{ mediaType: "image/png", data: "not base64!" }],
-      [{ mediaType: "image/png", data: "" }],
-      [{ mediaType: "image/png", data: "A".repeat(1_500_001) }],
-      ["data:image/png;base64,AAAA"],
-    ])("imagem invalida %# vira 400 sem chamar o modelo", async (image) => {
-      const res = await POST(req({ prompt: "x", image }));
+      [{ images: [{ mediaType: "image/gif", data: PNG }] }],
+      [{ images: [{ mediaType: "image/svg+xml", data: PNG }] }],
+      [{ images: [{ mediaType: "image/png", data: "not base64!" }] }],
+      [{ images: [{ mediaType: "image/png", data: "" }] }],
+      [{ images: [{ mediaType: "image/png", data: "A".repeat(900_001) }] }],
+      [{ images: [ok, ok, ok, ok, ok] }],
+      [{ images: "data:image/png;base64,AAAA" }],
+      [{ image: { mediaType: "image/gif", data: PNG } }],
+    ])("imagens invalidas %# viram 400 sem chamar o modelo", async (extra) => {
+      const res = await POST(req({ prompt: "x", ...extra }));
       expect(res.status).toBe(400);
       expect(vi.mocked(streamText)).not.toHaveBeenCalled();
     });
 
-    it("imagem no limite maximo cabe no corpo", async () => {
+    it("4 imagens no limite maximo cabem no corpo", async () => {
       state.parts = [{ type: "text-delta", text: "a" }];
+      const big = { mediaType: "image/webp", data: "A".repeat(900_000) };
       const res = await POST(
         req({
           prompt: "x".repeat(2000),
           currentCode: "a".repeat(30_000),
-          image: { mediaType: "image/webp", data: "A".repeat(1_500_000) },
+          images: [big, big, big, big],
         }),
       );
       expect(res.status).toBe(200);
       await res.text();
+      expect(call().messages?.[0].content).toHaveLength(9);
     });
   });
 });

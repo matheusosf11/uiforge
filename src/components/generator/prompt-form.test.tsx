@@ -328,7 +328,7 @@ describe("PromptForm", () => {
     });
   });
 
-  describe("reference image", () => {
+  describe("reference images", () => {
     const base = {
       value: "x",
       onChange: () => {},
@@ -336,51 +336,73 @@ describe("PromptForm", () => {
       onStop: () => {},
       isLoading: false,
     };
-    const png = () => new File(["x"], "print.png", { type: "image/png" });
+    const png = (name = "print.png") => new File(["x"], name, { type: "image/png" });
+    const attached = (n: number) =>
+      Array.from({ length: n }, (_, i) => ({
+        name: `img-${i + 1}.png`,
+        src: `data:image/jpeg;base64,A${i}`,
+      }));
 
     it("hides the image controls when attaching is not wired", () => {
       render(<PromptForm {...base} />);
-      expect(screen.queryByRole("button", { name: "Imagem" })).toBeNull();
+      expect(screen.queryByRole("button", { name: /Imagem/ })).toBeNull();
     });
 
-    it("attaches a picked file and lets it be removed", async () => {
+    it("attaches several picked files at once", async () => {
       const user = userEvent.setup();
-      const onAttachImage = vi.fn();
-      const onRemoveImage = vi.fn();
-      const { rerender } = render(
-        <PromptForm {...base} onAttachImage={onAttachImage} />,
-      );
-      const file = png();
-      await user.upload(screen.getByLabelText("Anexar imagem de referência"), file);
-      expect(onAttachImage).toHaveBeenCalledWith(file);
+      const onAttachImages = vi.fn();
+      render(<PromptForm {...base} onAttachImages={onAttachImages} />);
+      const files = [png("a.png"), png("b.png")];
+      await user.upload(screen.getByLabelText("Anexar imagem de referência"), files);
+      expect(onAttachImages).toHaveBeenCalledWith(files);
+    });
 
-      rerender(
+    it("lists the attached images in order and removes one by index", async () => {
+      const user = userEvent.setup();
+      const onRemoveImage = vi.fn();
+      render(
         <PromptForm
           {...base}
-          onAttachImage={onAttachImage}
+          onAttachImages={vi.fn()}
           onRemoveImage={onRemoveImage}
-          image={{ name: "print.png", src: "data:image/jpeg;base64,AA" }}
+          images={attached(2)}
         />,
       );
-      expect(
-        screen.getByRole("img", { name: "Imagem de referência anexada" }),
-      ).toBeTruthy();
-      expect(screen.getByText("print.png")).toBeTruthy();
-      expect(screen.getByRole("button", { name: "Trocar imagem" })).toBeTruthy();
-      await user.click(screen.getByRole("button", { name: "Remover imagem" }));
-      expect(onRemoveImage).toHaveBeenCalled();
+      expect(screen.getByRole("list", { name: "Imagens de referência (2 de 4)" })).toBeTruthy();
+      expect(screen.getByRole("img", { name: "Imagem 1 anexada" })).toBeTruthy();
+      expect(screen.getByRole("img", { name: "Imagem 2 anexada" })).toBeTruthy();
+      expect(screen.getByText("img-2.png")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Imagem (2/4)" })).toBeTruthy();
+      await user.click(screen.getByRole("button", { name: "Remover imagem 2" }));
+      expect(onRemoveImage).toHaveBeenCalledWith(1);
     });
 
-    it("attaches a pasted or dropped image", () => {
-      const onAttachImage = vi.fn();
-      render(<PromptForm {...base} onAttachImage={onAttachImage} />);
+    it("disables attaching once 4 images are attached", () => {
+      const onAttachImages = vi.fn();
+      render(
+        <PromptForm {...base} onAttachImages={onAttachImages} images={attached(4)} />,
+      );
+      const button = screen.getByRole("button", { name: "Imagem (4/4)" }) as HTMLButtonElement;
+      expect(button.disabled).toBe(true);
+      expect(button.title).toBe("Máximo de 4 imagens");
+      fireEvent.paste(screen.getByRole("textbox", { name: "Prompt" }), {
+        clipboardData: { files: [png()] },
+      });
+      expect(onAttachImages).not.toHaveBeenCalled();
+    });
+
+    it("attaches pasted or dropped images, ignoring other files", () => {
+      const onAttachImages = vi.fn();
+      render(<PromptForm {...base} onAttachImages={onAttachImages} />);
       const field = screen.getByRole("textbox", { name: "Prompt" });
       const pasted = png();
       fireEvent.paste(field, { clipboardData: { files: [pasted] } });
-      expect(onAttachImage).toHaveBeenLastCalledWith(pasted);
-      const dropped = png();
-      fireEvent.drop(field, { dataTransfer: { files: [dropped], types: ["Files"] } });
-      expect(onAttachImage).toHaveBeenLastCalledWith(dropped);
+      expect(onAttachImages).toHaveBeenLastCalledWith([pasted]);
+      const a = png("a.png");
+      const b = png("b.png");
+      const txt = new File(["x"], "notes.txt", { type: "text/plain" });
+      fireEvent.drop(field, { dataTransfer: { files: [a, txt, b], types: ["Files"] } });
+      expect(onAttachImages).toHaveBeenLastCalledWith([a, b]);
     });
 
     it("shows the refusal message and disables attaching while loading", () => {
@@ -388,7 +410,7 @@ describe("PromptForm", () => {
         <PromptForm
           {...base}
           isLoading
-          onAttachImage={vi.fn()}
+          onAttachImages={vi.fn()}
           imageError="Use uma imagem PNG, JPG ou WebP."
         />,
       );

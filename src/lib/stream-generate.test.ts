@@ -49,17 +49,36 @@ describe("streamGenerate", () => {
     expect(JSON.parse(init2.body)).toEqual({ prompt: "p", currentCode: "c" });
   });
 
-  it("sends only the image type and data, never the file name", async () => {
+  it("sends only each image's type and data, never file names", async () => {
     const fetchImpl = fetchOf(new Response(streamOf(["x"])));
     await streamGenerate(
-      { prompt: "p", image: { mediaType: "image/jpeg", data: "AAAA", name: "eu.jpg" } },
+      {
+        prompt: "p",
+        images: [
+          { mediaType: "image/jpeg", data: "AAAA", name: "eu.jpg" },
+          { mediaType: "image/png", data: "BBBB", name: "logo.png" },
+        ],
+      },
       { signal: new AbortController().signal, onText: () => {}, fetchImpl },
     );
     const init = (fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1];
     expect(JSON.parse(init.body)).toEqual({
       prompt: "p",
-      image: { mediaType: "image/jpeg", data: "AAAA" },
+      images: [
+        { mediaType: "image/jpeg", data: "AAAA" },
+        { mediaType: "image/png", data: "BBBB" },
+      ],
     });
+  });
+
+  it("omits images when the list is empty", async () => {
+    const fetchImpl = fetchOf(new Response(streamOf(["x"])));
+    await streamGenerate(
+      { prompt: "p", images: [] },
+      { signal: new AbortController().signal, onText: () => {}, fetchImpl },
+    );
+    const init = (fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    expect(JSON.parse(init.body)).toEqual({ prompt: "p" });
   });
 
   it("mid-stream error never yields ok true", async () => {

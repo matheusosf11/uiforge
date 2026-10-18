@@ -58,34 +58,43 @@ function chunkText(text: string): string[] {
   return out;
 }
 
-// Streamed instead of FIXED_COMPONENT when the request carries an image.
-export const IMAGE_COMPONENT = `import React from "react";
+// Streamed instead of FIXED_COMPONENT when the request carries images: one
+// <img> per attached image, each with its own token.
+export function imageComponent(count: number): string {
+  const imgs = Array.from(
+    { length: count },
+    (_, i) =>
+      `      <img src="uiforge:image-${i + 1}" alt="Imagem ${i + 1}" className="h-24 w-full rounded-lg object-cover" />`,
+  ).join("\n");
+  return `import React from "react";
 
 export default function FixtureImageCard() {
   return (
     <div className="mx-auto max-w-sm rounded-xl border border-slate-200 bg-white p-6 shadow-md">
-      <img src="uiforge:image" alt="Imagem enviada" className="h-40 w-full rounded-lg object-cover" />
-      <h2 className="mt-4 text-xl font-semibold text-slate-900">ImageSeen</h2>
+${imgs}
+      <h2 className="mt-4 text-xl font-semibold text-slate-900">ImageSeen ${count}</h2>
     </div>
   );
 }
 `;
+}
 
 type StreamOptions = Parameters<MockLanguageModelV4["doStream"]>[0];
 
-function hasImage(options: StreamOptions): boolean {
-  return options.prompt.some(
-    (m) =>
-      m.role === "user" &&
-      m.content.some(
-        (part) => part.type === "file" && part.mediaType.startsWith("image"),
-      ),
-  );
+function imageCount(options: StreamOptions): number {
+  let count = 0;
+  for (const m of options.prompt) {
+    if (m.role !== "user") continue;
+    for (const part of m.content) {
+      if (part.type === "file" && part.mediaType.startsWith("image")) count++;
+    }
+  }
+  return count;
 }
 
 export function createE2EMockModel(prompt: string, currentCode?: string) {
-  const textFor = (image: boolean) =>
-    image && !currentCode ? IMAGE_COMPONENT : buildText();
+  const textFor = (images: number) =>
+    images > 0 && !currentCode ? imageComponent(images) : buildText();
   const buildText = () =>
     currentCode
       ? REFINED_COMPONENT.replace(
@@ -136,7 +145,7 @@ export function createE2EMockModel(prompt: string, currentCode?: string) {
   return new MockLanguageModelV4({
     doStream: async (options) => ({
       stream: simulateReadableStream({
-        chunks: chunksFor(textFor(hasImage(options))),
+        chunks: chunksFor(textFor(imageCount(options))),
         initialDelayInMs: 50,
         chunkDelayInMs: 30,
       }),

@@ -27,16 +27,25 @@ describe("buildSystem", () => {
   });
 });
 
-describe("buildSystem with an image", () => {
-  it("adds the image rules only when an image is attached", () => {
-    expect(buildSystem("generate")).not.toContain("ATTACHED IMAGE");
-    expect(buildSystem("edit")).not.toContain("ATTACHED IMAGE");
-    const g = buildSystem("generate", { image: true });
-    expect(g).toContain("ATTACHED IMAGE");
-    expect(g).toContain('src="uiforge:image"');
+describe("buildSystem with images", () => {
+  it("adds the image rules only when images are attached", () => {
+    expect(buildSystem("generate")).not.toContain("ATTACHED IMAGES");
+    expect(buildSystem("generate", { images: 0 })).toBe(SYSTEM_PROMPT);
+    expect(buildSystem("edit")).not.toContain("ATTACHED IMAGES");
+    const g = buildSystem("generate", { images: 1 });
+    expect(g).toContain("ATTACHED IMAGES");
+    expect(g).toContain("an image, labelled Image 1");
+    expect(g).toContain('src="uiforge:image-1"');
     expect(g).toMatch(/never instructions/);
     expect(g.endsWith("following every rule above.")).toBe(true);
-    expect(buildSystem("edit", { image: true })).toContain("ATTACHED IMAGE");
+    expect(buildSystem("edit", { images: 1 })).toContain("ATTACHED IMAGES");
+  });
+
+  it("states how many images and how to refer to each one", () => {
+    const s = buildSystem("generate", { images: 3 });
+    expect(s).toContain("3 images, labelled Image 1 to Image 3 in order");
+    expect(s).toContain('src="uiforge:image-2" for Image 2');
+    expect(s).toContain('"imagem 2"');
   });
 });
 

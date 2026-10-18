@@ -2,19 +2,27 @@
 export const IMAGE_MEDIA_TYPES = ["image/png", "image/jpeg", "image/webp"] as const;
 export type ImageMediaType = (typeof IMAGE_MEDIA_TYPES)[number];
 
-/** Max base64 length of the image sent to /api/generate (~1.1 MB of bytes). */
-export const MAX_IMAGE_BASE64_LENGTH = 1_500_000;
+/** Max number of images attached to one request. */
+export const MAX_IMAGES = 4;
+/**
+ * Max base64 length of each image (~675 KB of bytes). Four of them plus the
+ * code stay under Vercel's 4.5 MB request body limit.
+ */
+export const MAX_IMAGE_BASE64_LENGTH = 900_000;
 /** Largest file the browser will try to shrink before refusing it. */
 export const MAX_IMAGE_FILE_BYTES = 15 * 1024 * 1024;
 /** Longest side of the image after shrinking. */
 const MAX_IMAGE_SIDE = 1280;
 
 /**
- * src the model uses for an <img> that shows the attached image. The preview
- * swaps it for the image itself; the downloaded code keeps it as a marker the
- * user replaces with a real path.
+ * src the model uses for an <img> that shows attached image n (1-based). The
+ * preview swaps it for the image itself; the downloaded code keeps it as a
+ * marker the user replaces with a real path.
  */
+export const imageToken = (n: number) => `uiforge:image-${n}`;
+/** Single-image marker from the first version; treated as image 1. */
 export const IMAGE_TOKEN = "uiforge:image";
+const TOKEN_PATTERN = /uiforge:image(?:-(\d+))?/g;
 
 export type PromptImage = {
   mediaType: ImageMediaType;
@@ -52,7 +60,7 @@ export async function prepareImage(file: File): Promise<PromptImage> {
   }
   try {
     for (const [side, quality] of [
-      [MAX_IMAGE_SIDE, 0.85],
+      [MAX_IMAGE_SIDE, 0.82],
       [MAX_IMAGE_SIDE, 0.7],
       [960, 0.7],
       [720, 0.6],
@@ -77,8 +85,15 @@ export async function prepareImage(file: File): Promise<PromptImage> {
   throw new PromptImageError("Não foi possível reduzir a imagem. Tente outra.");
 }
 
-/** Code for the preview with every IMAGE_TOKEN pointing at the image. */
-export function withPreviewImage(code: string, dataUrl: string | null): string {
-  if (!dataUrl || !code.includes(IMAGE_TOKEN)) return code;
-  return code.split(IMAGE_TOKEN).join(dataUrl);
+/**
+ * Code for the preview with each image token pointing at its image
+ * (uiforge:image-N is image N; the bare uiforge:image is image 1). Tokens
+ * without a matching image are left as they are.
+ */
+export function withPreviewImages(code: string, dataUrls: readonly string[]): string {
+  if (dataUrls.length === 0 || !code.includes(IMAGE_TOKEN)) return code;
+  return code.replace(TOKEN_PATTERN, (match, n?: string) => {
+    const index = n === undefined ? 0 : Number(n) - 1;
+    return dataUrls[index] ?? match;
+  });
 }
