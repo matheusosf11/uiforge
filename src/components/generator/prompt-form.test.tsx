@@ -1,5 +1,6 @@
 /// <reference types="vitest/globals" />
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PromptForm } from "@/components/generator/prompt-form";
@@ -146,10 +147,14 @@ describe("PromptForm", () => {
       onSubmit = vi.fn(),
       chips,
       isLoading = false,
+      turnList,
+      baseNotice,
     }: {
       onSubmit?: () => void;
       chips: typeof CHIPS | null;
       isLoading?: boolean;
+      turnList?: ReactNode;
+      baseNotice?: string | null;
     }) {
       const [value, setValue] = useState("");
       return (
@@ -162,6 +167,8 @@ describe("PromptForm", () => {
           mode="refine"
           chips={chips}
           sessionBar={<div data-testid="bar">barra</div>}
+          turnList={turnList}
+          baseNotice={baseNotice}
         />
       );
     }
@@ -235,6 +242,74 @@ describe("PromptForm", () => {
       expect(
         bar.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
+    });
+
+    it("renders the turnList slot between the sessionBar and the title", () => {
+      render(
+        <RefineHarness
+          chips={CHIPS}
+          turnList={<div data-testid="turns">turnos</div>}
+        />,
+      );
+      const bar = screen.getByTestId("bar");
+      const turns = screen.getByTestId("turns");
+      const title = screen.getByRole("heading", { name: "Refinar componente" });
+      expect(
+        bar.compareDocumentPosition(turns) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        turns.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it("renders the base notice between the title and the textarea and describes the textarea", () => {
+      const notice = "Refinar a partir da v1 — v2 será descartada";
+      const { container } = render(
+        <RefineHarness chips={CHIPS} baseNotice={notice} />,
+      );
+      const el = container.querySelector("#refine-base-notice");
+      expect(el).not.toBeNull();
+      expect(el!.textContent).toBe(notice);
+      const title = screen.getByRole("heading", { name: "Refinar componente" });
+      const ta = screen.getByRole("textbox", { name: "Descreva a mudança" });
+      expect(
+        title.compareDocumentPosition(el!) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        el!.compareDocumentPosition(ta) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(ta.getAttribute("aria-describedby")).toBe(
+        "refine-base-notice prompt-char-count",
+      );
+    });
+
+    it("omits the base notice when baseNotice is null or missing", () => {
+      const { container, unmount } = render(
+        <RefineHarness chips={CHIPS} baseNotice={null} />,
+      );
+      expect(container.querySelector("#refine-base-notice")).toBeNull();
+      expect(
+        screen
+          .getByRole("textbox", { name: "Descreva a mudança" })
+          .getAttribute("aria-describedby"),
+      ).toBe("prompt-char-count");
+      unmount();
+      const second = render(<RefineHarness chips={CHIPS} />);
+      expect(second.container.querySelector("#refine-base-notice")).toBeNull();
+      expect(
+        screen
+          .getByRole("textbox", { name: "Descreva a mudança" })
+          .getAttribute("aria-describedby"),
+      ).toBe("prompt-char-count");
+    });
+
+    it("does not make the base notice a live region", () => {
+      const { container } = render(
+        <RefineHarness chips={CHIPS} baseNotice="Refinar a partir da v1" />,
+      );
+      const el = container.querySelector("#refine-base-notice")!;
+      expect(el.hasAttribute("aria-live")).toBe(false);
+      expect(el.getAttribute("role")).toBeNull();
     });
 
     it("exposes the textarea through textareaRef", () => {
