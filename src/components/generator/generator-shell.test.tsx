@@ -404,3 +404,259 @@ describe("GeneratorShell", () => {
     expect(await screen.findByRole("button", { name: "Gerar" })).toBeInTheDocument();
   });
 });
+
+const LIST_NAME = "Histórico de versões";
+
+function list() {
+  return screen.getByRole("list", { name: LIST_NAME });
+}
+
+function suggestCalls() {
+  return vi
+    .mocked(fetch)
+    .mock.calls.filter(([url]) => url === "/api/suggest").length;
+}
+
+describe("turn list", () => {
+  it("appears only after the first commit with the current v1 item", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    expect(screen.queryByRole("list", { name: LIST_NAME })).toBeNull();
+    await generateFirst(user);
+    await screen.findByText("Pronto — v1");
+
+    expect(within(list()).getAllByRole("listitem")).toHaveLength(1);
+    expect(
+      within(list()).getByRole("button", {
+        name: "v1, versão atual: um card. Concluída.",
+      }),
+    ).toHaveAttribute("aria-current", "true");
+  });
+
+  it("restores an earlier version, keeps focus and shows the base notice", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await twoVersions(user);
+
+    const v1 = within(list()).getByRole("button", {
+      name: "Restaurar v1: um card. Concluída.",
+    });
+    await user.click(v1);
+
+    expect(await screen.findByText("Voltou para v1")).toBeInTheDocument();
+    expect(screen.getByTestId("preview")).toHaveAttribute(
+      "data-code",
+      FIXED_COMPONENT.trim(),
+    );
+    const current = within(list()).getByRole("button", {
+      name: "v1, versão atual: um card. Concluída.",
+    });
+    expect(current).toBe(v1);
+    expect(v1).toHaveFocus();
+    expect(
+      within(list()).getByRole("button", { name: /^Restaurar v2: azul/ }),
+    ).toHaveAccessibleName(/Será descartada ao refinar\.$/);
+    expect(
+      screen.getByText("Refinar a partir da v1 — v2 será descartada"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("textbox")).toHaveAttribute(
+      "aria-describedby",
+      "refine-base-notice prompt-char-count",
+    );
+    expect(screen.getByText("v1 · 2 versões")).toBeInTheDocument();
+  });
+
+  it("restores a later version forward and clears the notice", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await twoVersions(user);
+    await user.click(
+      within(list()).getByRole("button", {
+        name: "Restaurar v1: um card. Concluída.",
+      }),
+    );
+    await screen.findByText("Voltou para v1");
+
+    await user.click(
+      within(list()).getByRole("button", {
+        name: "Restaurar v2: azul. Concluída. Será descartada ao refinar.",
+      }),
+    );
+    expect(await screen.findByText("Foi para v2")).toBeInTheDocument();
+    expect(screen.queryByText(/^Refinar a partir da/)).toBeNull();
+    expect(screen.getByRole("textbox")).toHaveAttribute(
+      "aria-describedby",
+      "prompt-char-count",
+    );
+  });
+
+  it("refining after a restore discards the later versions", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await twoVersions(user);
+    await refine(user, "verde");
+    await screen.findByText("Pronto — v3");
+
+    await user.click(
+      within(list()).getByRole("button", {
+        name: "Restaurar v1: um card. Concluída.",
+      }),
+    );
+    expect(
+      await screen.findByText(
+        "Refinar a partir da v1 — v2 a v3 serão descartadas",
+      ),
+    ).toBeInTheDocument();
+
+    await refine(user, "mais");
+    expect(await screen.findByText("Pronto — v2")).toBeInTheDocument();
+    expect(screen.getByText("v2 · 2 versões")).toBeInTheDocument();
+    expect(
+      within(list()).queryByRole("button", { name: /^Restaurar v3/ }),
+    ).toBeNull();
+    expect(screen.queryByText(/^Refinar a partir da/)).toBeNull();
+  });
+
+  it("scrolls the code panel to the top on restore", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await twoVersions(user);
+
+    const pre = document.querySelector("#panel-code pre") as HTMLPreElement;
+    expect(pre).not.toBeNull();
+    pre.scrollTop = 500;
+    expect(pre.scrollTop).toBe(500);
+
+    await user.click(
+      within(list()).getByRole("button", {
+        name: "Restaurar v1: um card. Concluída.",
+      }),
+    );
+    await screen.findByText("Voltou para v1");
+    await waitFor(() =>
+      expect(
+        (document.querySelector("#panel-code pre") as HTMLPreElement).scrollTop,
+      ).toBe(0),
+    );
+  });
+
+  it("chips follow the restored version from cache", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await generateFirst(user);
+    await screen.findByText("Pronto — v1");
+    const group = () =>
+      screen.getByRole("group", { name: "Sugestões de refinamento" });
+    await within(group()).findByRole("button", { name: /Cor forte/ });
+
+    await refine(user, "azul");
+    await screen.findByText("Pronto — v2");
+    await waitFor(() => expect(suggestCalls()).toBe(2));
+    await within(group()).findByRole("button", { name: /Cor forte/ });
+    const calls = suggestCalls();
+
+    await user.click(
+      within(list()).getByRole("button", {
+        name: "Restaurar v1: um card. Concluída.",
+      }),
+    );
+    await screen.findByText("Voltou para v1");
+    expect(
+      await within(group()).findByRole("button", { name: /Cor forte/ }),
+    ).toBeInTheDocument();
+    expect(suggestCalls()).toBe(calls);
+  });
+
+  it("shows a gerando row and disables items while streaming", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await generateFirst(user);
+    await screen.findByText("Pronto — v1");
+
+    behaviors.push("hang");
+    await refine(user, "azul");
+    await screen.findByText("Refinando…");
+    expect(within(list()).getByText("gerando…")).toBeInTheDocument();
+    const v1 = within(list()).getByRole("button", {
+      name: "v1, versão atual: um card. Concluída.",
+    });
+    expect(v1).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "Parar" }));
+    await waitFor(() =>
+      expect(within(list()).queryByText("gerando…")).toBeNull(),
+    );
+    expect(v1).toBeEnabled();
+  });
+
+  it("shows an erro row for a failed refine that disappears on retry", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await generateFirst(user);
+    await screen.findByText("Pronto — v1");
+
+    behaviors.push("error");
+    await refine(user, "azul");
+    await screen.findByRole("alert");
+    const items = within(list()).getAllByRole("listitem");
+    expect(items.some((li) => li.textContent?.includes("Erro: azul"))).toBe(
+      true,
+    );
+    expect(within(list()).getAllByRole("button")).toHaveLength(1);
+
+    await user.click(screen.getByRole("button", { name: "Tentar de novo" }));
+    expect(await screen.findByText("Pronto — v2")).toBeInTheDocument();
+    expect(within(list()).queryByText(/Erro:/)).toBeNull();
+  });
+
+  it("Ctrl+Z on a focused item undoes and keeps focus on it", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await twoVersions(user);
+
+    const v2 = within(list()).getByRole("button", {
+      name: "v2, versão atual: azul. Concluída.",
+    });
+    v2.focus();
+    expect(v2).toHaveFocus();
+    await user.keyboard("{Control>}z{/Control}");
+    expect(await screen.findByText("Voltou para v1")).toBeInTheDocument();
+    expect(v2).toHaveAccessibleName(
+      "Restaurar v2: azul. Concluída. Será descartada ao refinar.",
+    );
+    expect(v2).toHaveFocus();
+  });
+
+  it("history disclosure keeps its state and collapses on Novo componente", async () => {
+    const user = userEvent.setup();
+    render(<GeneratorShell />);
+    await twoVersions(user);
+
+    const toggle = screen.getByRole("button", { name: "Histórico (2)" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveAttribute("aria-controls", "turn-list-region");
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+
+    await user.click(
+      within(list()).getByRole("button", {
+        name: "Restaurar v1: um card. Concluída.",
+      }),
+    );
+    await screen.findByText("Voltou para v1");
+    expect(
+      screen.getByRole("button", { name: "Histórico (2)" }),
+    ).toHaveAttribute("aria-expanded", "true");
+
+    await user.click(screen.getByRole("button", { name: /Novo componente/ }));
+    await user.click(
+      await screen.findByRole("button", { name: "Descartar e começar" }),
+    );
+    await screen.findByText("Novo componente iniciado");
+    await generateFirst(user);
+    await screen.findByText("Pronto — v1");
+    expect(
+      screen.getByRole("button", { name: "Histórico (1)" }),
+    ).toHaveAttribute("aria-expanded", "false");
+  });
+});
