@@ -38,7 +38,7 @@ A user types a prompt and gets working, previewable React + Tailwind component c
 - [x] Iterative refinement: after the first generation, a follow-up prompt edits the current component (current code + instruction sent to the model); "Novo componente" starts from scratch — validated in Phase 6 (session reducer, refine-by-default form, undo + Ctrl/Cmd+Z, AlertDialog reset, model-generated suggestion chips via `/api/suggest`)
 - [x] In-memory version history within the session (go back to a previous version) — validated in Phases 6–7 (undo, restore any version, 20-version cap with stable numbering)
 - [x] Visible list of turns (prompts sent in the session, mini-chat style) — validated in Phase 7 (accessible turn list, gerando/erro status, restore, base notice)
-- [ ] Editable code: user edits in the code view and refinement uses the edited version
+- [x] Editable code: user edits in the code view and refinement uses the edited version — validated in Phase 8 (react-simple-code-editor, 500 ms preview debounce, "Edição manual" versions committed before refine/undo/restore)
 - [ ] Demo GIF (`docs/demo.gif`) linked from both READMEs
 
 ### Out of Scope
@@ -99,4 +99,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-18 — Phase 7 (turn list & version navigation) complete*
+*Last updated: 2026-10-18 — Phase 8 (editable code view) complete; site is dark-only by user decision*

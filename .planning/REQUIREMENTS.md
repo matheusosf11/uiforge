@@ -30,11 +30,11 @@ Requirements for this milestone. Each maps to roadmap phases. IDs continue from 
 
 ### Editable Code
 
-- [ ] **EDIT-04**: User can edit the code directly in the code view (syntax-highlighted, light/dark themes kept); editing is locked while a generation streams
-- [ ] **EDIT-05**: Manual edits update the live preview after a short debounce (~500 ms); invalid edited code shows the existing preview error state without breaking the app
-- [ ] **EDIT-06**: Refining after manual edits uses the edited code as the base and records it as an "Edição manual" version first (so undo can return to it)
-- [ ] **EDIT-07**: Copy and download export the code currently shown (including manual edits)
-- [ ] **EDIT-08**: Code editor is keyboard-accessible (labelled, no Tab keyboard trap, Escape exits)
+- [x] **EDIT-04**: User can edit the code directly in the code view (syntax-highlighted, light/dark themes kept); editing is locked while a generation streams
+- [x] **EDIT-05**: Manual edits update the live preview after a short debounce (~500 ms); invalid edited code shows the existing preview error state without breaking the app
+- [x] **EDIT-06**: Refining after manual edits uses the edited code as the base and records it as an "Edição manual" version first (so undo can return to it)
+- [x] **EDIT-07**: Copy and download export the code currently shown (including manual edits)
+- [x] **EDIT-08**: Code editor is keyboard-accessible (labelled, no Tab keyboard trap, Escape exits)
 
 ### Keyboard Shortcuts
 
@@ -94,11 +94,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HIST-03 | Phase 7 | Complete |
 | HIST-04 | Phase 7 | Complete |
 | HIST-05 | Phase 7 | Complete |
-| EDIT-04 | Phase 8 | Pending |
-| EDIT-05 | Phase 8 | Pending |
-| EDIT-06 | Phase 8 | Pending |
-| EDIT-07 | Phase 8 | Pending |
-| EDIT-08 | Phase 8 | Pending |
+| EDIT-04 | Phase 8 | Complete |
+| EDIT-05 | Phase 8 | Complete |
+| EDIT-06 | Phase 8 | Complete |
+| EDIT-07 | Phase 8 | Complete |
+| EDIT-08 | Phase 8 | Complete |
 | DOCS-01 | Phase 9 | Pending |
 | DOCS-02 | Phase 9 | Pending |
 | QUAL-07 | Phase 9 | Pending |

@@ -118,5 +118,5 @@ Plans:
 | 5. Refine API Contract & Edit Prompt | v1.1 | 2/2 | Complete    | 2026-10-17 |
 | 6. Session Core & Refine Loop | v1.1 | 7/7 | Complete    | 2026-10-18 |
 | 7. Turn List & Version Navigation | v1.1 | 5/5 | Complete    | 2026-10-18 |
-| 8. Editable Code View | v1.1 | 6/6 | Complete   | 2026-10-18 |
+| 8. Editable Code View | v1.1 | 6/6 | Complete    | 2026-10-18 |
 | 9. E2E, Demo GIF & Docs | v1.1 | 0/0 | Not started | - |
