@@ -1,6 +1,6 @@
 # Milestones
 
-## v1.2 Ferramentas de Design (Completed: 2026-10-18 — recorded retroactively 2026-10-20, not yet pushed/deployed)
+## v1.2 Ferramentas de Design (Completed: 2026-10-18 — recorded retroactively 2026-10-20; deployed to Production 2026-10-19)
 
 **Delivered:** Design tooling on top of the refine loop: reference images, a categorized prompt gallery, local auto-saved projects with version diff, device/theme preview, a visual style editor, and shared (Upstash) rate limits with stricter API hardening.
 
@@ -22,7 +22,7 @@
 
 ---
 
-## v1.1 Refinamento Iterativo (Completed: 2026-10-18 — not yet pushed/deployed)
+## v1.1 Refinamento Iterativo (Completed: 2026-10-18 — deployed to Production)
 
 **Delivered:** After the first generation, follow-up prompts refine the current component (current code + instruction), with in-memory version history, an accessible turn list, a hand-editable code view and a recorded demo GIF.
 

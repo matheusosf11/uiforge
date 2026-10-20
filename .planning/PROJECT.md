@@ -6,11 +6,11 @@ UIForge is an AI-powered UI component generator (a focused "v0 lite"): the user 
 
 ## Current State
 
-**v1.2 Ferramentas de Design completed 2026-10-18** (built outside GSD, recorded retroactively 2026-10-20; local, not yet pushed/deployed). On top of the v1.1 refine loop (follow-up prompts, version history, hand-editable code), users can attach reference images, pick categorized examples, keep auto-saved local projects, diff versions, preview at device sizes in light/dark, and tweak styles in a visual editor. Rate limits can be shared across instances via optional Upstash Redis.
+**v1.2 Ferramentas de Design completed 2026-10-18** (built outside GSD, recorded retroactively 2026-10-20; live in Production since 2026-10-19, commit `1ce5e99`). On top of the v1.1 refine loop (follow-up prompts, version history, hand-editable code), users can attach reference images, pick categorized examples, keep auto-saved local projects, diff versions, preview at device sizes in light/dark, and tweak styles in a visual editor. Rate limits can be shared across instances via optional Upstash Redis.
 
 ## Next Milestone Goals
 
-Not defined yet — start with `/gsd-new-milestone`. Candidates: push + redeploy v1.1/v1.2, manual verification of v1.2 features, share links for sessions.
+Not defined yet — start with `/gsd-new-milestone`. Candidates: manual verification of v1.2 features, share links for sessions.
 
 <details>
 <summary>v1.1 milestone goal (archived)</summary>
@@ -63,7 +63,7 @@ A user types a prompt and gets working, previewable React + Tailwind component c
 
 ## Context
 
-**Current state (v1.1 completed 2026-10-18, local):** ~11,500 LOC TypeScript/TSX in `src/` + `e2e/`, 419 unit tests. v1.1 added the session reducer, `/api/suggest`, react-simple-code-editor, a three.js topology background and a Spline robot mascot (loaded on demand, >=1536px, motion allowed). The live deploy still runs v1.0 until the user pushes. Previously (v1.0 shipped 2026-10-17): ~2,700 LOC. Next.js 15.5 App Router, React 19, Tailwind v4, shadcn/ui, Vercel AI SDK v7 + @ai-sdk/google (gemini-3.8-flash primary). Live at https://uiforge-orlasup-project.vercel.app. Known issue found after launch and fixed: browser extensions blocking jsDelivr blanked the preview, so the preview runtime is now self-hosted. Since v1.1, refinements send only the current code + instruction (no prompt history).
+**Current state (v1.2 live 2026-10-19):** 522 unit tests; v1.2 added +6,091 lines over v1.1. v1.1 (~11,500 LOC TS/TSX, 419 unit tests) v1.1 added the session reducer, `/api/suggest`, react-simple-code-editor, a three.js topology background and a Spline robot mascot (loaded on demand, >=1536px, motion allowed). Previously (v1.0 shipped 2026-10-17): ~2,700 LOC. Next.js 15.5 App Router, React 19, Tailwind v4, shadcn/ui, Vercel AI SDK v7 + @ai-sdk/google (gemini-3.8-flash primary). Live at https://uiforge-orlasup-project.vercel.app. Known issue found after launch and fixed: browser extensions blocking jsDelivr blanked the preview, so the preview runtime is now self-hosted. Since v1.1, refinements send only the current code + instruction (no prompt history).
 
 - Target user: the project owner, a front-end developer building a portfolio to attract recruiters at large companies.
 - AI must use a free tier: Google Gemini via Vercel AI SDK (Groq is a documented fallback).
@@ -117,4 +117,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-20 after v1.2 milestone (recorded retroactively; not yet pushed/deployed)*
+*Last updated: 2026-10-20 after v1.2 milestone (recorded retroactively; v1.1 + v1.2 live in Production)*

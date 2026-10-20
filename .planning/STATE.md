@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-18)
 
 **Core value:** A user types a prompt and gets working, previewable React + Tailwind component code streamed back and rendered live.
-**Current focus:** Planning next milestone (v1.1 + v1.2 done locally; push/deploy pending user)
+**Current focus:** Planning next milestone (v1.1 + v1.2 live in Production)
 
 ## Current Position
 
