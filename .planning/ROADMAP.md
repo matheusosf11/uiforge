@@ -4,6 +4,7 @@
 
 - ✅ **v1.0 MVP** — Phases 1-4 (shipped 2026-10-17) · [archive](milestones/v1.0-ROADMAP.md)
 - ✅ **v1.1 Refinamento Iterativo** — Phases 5-9 (completed 2026-10-18) · [archive](milestones/v1.1-ROADMAP.md)
+- ✅ **v1.2 Ferramentas de Design** — built outside GSD, recorded retroactively (completed 2026-10-18) · [archive](milestones/v1.2-ROADMAP.md)
 
 ## Phases
 
@@ -25,6 +26,13 @@
 - [x] Phase 7: Turn List & Version Navigation (5/5 plans) — completed 2026-10-18
 - [x] Phase 8: Editable Code View (6/6 plans) — completed 2026-10-18
 - [x] Phase 9: E2E, Demo GIF & Docs (3/3 plans) — completed 2026-10-18
+
+</details>
+
+<details>
+<summary>✅ v1.2 Ferramentas de Design — COMPLETED 2026-10-18 (retroactive, no GSD phases)</summary>
+
+Built directly on `main` (commits `99f5380` → `1ce5e99`): draggable cards and reference images, shared rate limits and API hardening, categorized prompt gallery, local projects and version diff, device/theme preview, visual editor, e2e smokes. See [archive](milestones/v1.2-ROADMAP.md).
 
 </details>
 

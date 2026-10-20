@@ -1,5 +1,27 @@
 # Milestones
 
+## v1.2 Ferramentas de Design (Completed: 2026-10-18 — recorded retroactively 2026-10-20, not yet pushed/deployed)
+
+**Delivered:** Design tooling on top of the refine loop: reference images, a categorized prompt gallery, local auto-saved projects with version diff, device/theme preview, a visual style editor, and shared (Upstash) rate limits with stricter API hardening.
+
+**Phases completed:** none in GSD — built directly on `main` after v1.1 was archived; see [archive](milestones/v1.2-ROADMAP.md)
+**Timeline:** 2026-10-18 (9 commits, `99f5380` → `1ce5e99`)
+**Code:** 61 files in `src/` + `e2e/`, +6,091 / −439 lines
+**Tests:** 522 Vitest unit tests (35 files); Playwright smokes for the new features
+
+**Key accomplishments:**
+
+- Draggable generator cards; up to 4 reference images attached to the prompt
+- Optional Upstash Redis shares per-minute and per-day per-IP limits across instances (memory fallback); named 429 reasons with pt-BR wait messages; 403 cross-site / 415 non-JSON guards; preview accepts only its own frames' messages; CI coverage floor + secret scan
+- Example gallery by category and a design guide in the model prompt
+- localStorage projects (20 max, last one restored on reload), "Projetos" dialog and an LCS version diff ("Comparar")
+- Preview device sizes, light/dark preview and a usage guide download
+- Visual editor for colors, radius, spacing, text, borders and font
+
+**Known deferred items at close:** no GSD verification/UAT was run for v1.2 (manual mobile, screen-reader and touch checks pending).
+
+---
+
 ## v1.1 Refinamento Iterativo (Completed: 2026-10-18 — not yet pushed/deployed)
 
 **Delivered:** After the first generation, follow-up prompts refine the current component (current code + instruction), with in-memory version history, an accessible turn list, a hand-editable code view and a recorded demo GIF.

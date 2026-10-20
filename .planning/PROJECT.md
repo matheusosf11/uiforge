@@ -6,11 +6,11 @@ UIForge is an AI-powered UI component generator (a focused "v0 lite"): the user 
 
 ## Current State
 
-**v1.1 Refinamento Iterativo completed 2026-10-18** (local; not yet pushed/deployed). Users generate a component, then refine it with follow-up prompts, navigate an in-memory version history, edit the code by hand and keep refining from their edits. The UI is dark-only with a topology background and an interactive 3D robot mascot on wide screens.
+**v1.2 Ferramentas de Design completed 2026-10-18** (built outside GSD, recorded retroactively 2026-10-20; local, not yet pushed/deployed). On top of the v1.1 refine loop (follow-up prompts, version history, hand-editable code), users can attach reference images, pick categorized examples, keep auto-saved local projects, diff versions, preview at device sizes in light/dark, and tweak styles in a visual editor. Rate limits can be shared across instances via optional Upstash Redis.
 
 ## Next Milestone Goals
 
-Not defined yet — start with `/gsd-new-milestone`. Candidates: push + redeploy v1.1, distributed rate limiting (PLAT-01), persistence/share links for sessions.
+Not defined yet — start with `/gsd-new-milestone`. Candidates: push + redeploy v1.1/v1.2, manual verification of v1.2 features, share links for sessions.
 
 <details>
 <summary>v1.1 milestone goal (archived)</summary>
@@ -44,6 +44,13 @@ A user types a prompt and gets working, previewable React + Tailwind component c
 - ✓ Editable code view; refinement builds on manual edits — v1.1
 - ✓ Demo GIF (`docs/demo.gif`) linked from both READMEs; refine journey e2e — v1.1
 
+- ✓ Reference images (up to 4) and draggable generator cards — v1.2
+- ✓ Categorized example gallery and a design guide for the model — v1.2
+- ✓ Auto-saved local projects (localStorage, 20 max) and version diff — v1.2
+- ✓ Preview device sizes, light/dark preview, usage guide download — v1.2
+- ✓ Visual style editor (colors, radius, spacing, text, borders, font) — v1.2
+- ✓ Optional shared rate limits via Upstash (per-minute + per-day), cross-site/415 guards, CI secret scan — v1.2
+
 ### Active
 
 (None — define with `/gsd-new-milestone`)
@@ -51,8 +58,7 @@ A user types a prompt and gets working, previewable React + Tailwind component c
 ### Out of Scope
 
 - User authentication / accounts — portfolio demo, keeps v1 simple and frictionless
-- Persistent history of generations — not needed for the core demo loop
-- Distributed rate limiting (e.g. Upstash, PLAT-01) — out of scope / v2. A best-effort in-memory per-IP limit (5 generations/minute, per serverless instance) ships in Phase 4 as a partial, deliberate pull-forward
+- Server-side/cloud history of generations — local-only (localStorage) projects ship in v1.2; nothing is sent to a server
 - Multi-file / full-project generation — v1 focuses on a single component
 
 ## Context
@@ -81,7 +87,7 @@ A user types a prompt and gets working, previewable React + Tailwind component c
 | Project: UIForge (AI component generator) | Best demonstrates front-end skill while using modern AI; recognizable product category | ✓ Good — shipped v1.0 |
 | Google Gemini via Vercel AI SDK | Generous free tier + first-class streaming support | ✓ Shipped — model gemini-3.8-flash (2.5-flash unavailable to new keys, Phase 4) |
 | Sandpack for live preview + editor | Safe sandboxed execution of generated code; professional tooling | ✗ Replaced by sandboxed srcdoc iframe; Sandpack removed in Phase 4 |
-| Best-effort in-memory rate limit (5/min/IP) | Protect free-tier quota on public demo without infra | ✓ Shipped Phase 4; distributed limit stays v2 (PLAT-01) |
+| Best-effort in-memory rate limit (5/min/IP) | Protect free-tier quota on public demo without infra | ✓ Shipped Phase 4; optional Upstash shared limit added in v1.2 (PLAT-01) |
 | E2E with env-gated mock model | Deterministic, free CI without API key | ✓ Shipped Phase 4 (never active on Vercel Production) |
 | Next.js 15 App Router + TypeScript | User's primary stack; modern RSC/Server Actions story | ✓ Good |
 | No authentication in v1 | Keeps portfolio demo frictionless | ✓ Good |
@@ -111,4 +117,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-18 after v1.1 milestone (archived; not yet pushed/deployed)*
+*Last updated: 2026-10-20 after v1.2 milestone (recorded retroactively; not yet pushed/deployed)*

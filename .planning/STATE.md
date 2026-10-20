@@ -1,11 +1,11 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: Refinamento Iterativo
+milestone: v1.2
+milestone_name: Ferramentas de Design
 status: Awaiting next milestone
-stopped_at: Completed 09-03-PLAN.md
-last_updated: "2026-10-18T11:23:03.410Z"
-last_activity: 2026-10-18 — Milestone v1.1 completed and archived
+stopped_at: v1.2 recorded retroactively
+last_updated: "2026-10-20T12:00:00.000Z"
+last_activity: 2026-10-20 — Milestone v1.2 recorded retroactively and archived
 progress:
   total_phases: 5
   completed_phases: 5
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-18)
 
 **Core value:** A user types a prompt and gets working, previewable React + Tailwind component code streamed back and rendered live.
-**Current focus:** Planning next milestone (v1.1 done locally; push/deploy pending user)
+**Current focus:** Planning next milestone (v1.1 + v1.2 done locally; push/deploy pending user)
 
 ## Current Position
 
-Phase: Milestone v1.1 complete
+Phase: Milestone v1.2 complete (recorded retroactively)
 Plan: —
 Status: Awaiting next milestone
-Last activity: 2026-10-18 — Milestone v1.1 completed and archived
+Last activity: 2026-10-20 — Milestone v1.2 recorded retroactively and archived
 
 ## Performance Metrics
 
@@ -105,10 +105,17 @@ Items acknowledged and deferred at milestone v1.1 close on 2026-10-18:
 | verification_gap | 07-VERIFICATION | human_needed — screen reader (NVDA/VoiceOver), mobile disclosure, scroll geometry |
 | verification_gap | 08-VERIFICATION | human_needed — screen reader on editor, phone editing (iOS/Android) |
 
+Items acknowledged at milestone v1.2 retroactive close on 2026-10-20:
+
+| Category | Item | Status |
+|----------|------|--------|
+| verification_gap | v1.2 (all features) | no GSD verification/UAT — built outside GSD; manual mobile, screen-reader and visual-editor touch checks pending |
+| uncommitted | `.env.example` `SUGGEST_RATE_LIMIT_*` lines | kept local by user decision |
+
 ## Session Continuity
 
-Last session: 2026-10-18T07:00:00.000Z
-Stopped at: Completed 09-03-PLAN.md
+Last session: 2026-10-20T12:00:00.000Z
+Stopped at: v1.2 recorded retroactively
 Resume file: None
 
 ## Operator Next Steps
